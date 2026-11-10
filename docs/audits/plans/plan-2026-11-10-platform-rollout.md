@@ -1,0 +1,252 @@
+# 计划：多架构平台化收口（2026-11-10）
+
+> 状态：**待批准**。这是一次性完整方案，不是逐条推进的清单——按 Phase 顺序执行，
+> 每个 Phase 结束后全量门禁 + 全量测试必须是绿的，否则不进下一个 Phase。
+>
+> 起点：`fork/main` 已推送；工作区 24 个文件未提交（Phase 0 处理）。
+
+## 0. 现状基线（开始前的事实）
+
+| 项 | 值 |
+| --- | --- |
+| Python 全量 | 7526 passed / 10 skipped / 0 failed |
+| .NET | 752 passed / 0 failed，0 警告 |
+| 仓库门禁 | 30+ 个，全部 exit 0 |
+| pyright | 0 error / 0 warning / 0 information |
+| `sms_tool` 模块 | 336 tracked，包根 79 个冻结名 |
+| 入口 | 9 个已声明（CLI / 桌面 / compat / 2 operator / 2 service / scripts / build） |
+| `scripts/` | 65 文件，7 组已声明并执法 |
+| provider pack | 1 个（`openai.chatgpt`），声明 6 个能力，**已接线 1 个** |
+| 未解问题 | 账号级风控没有样本（住宅池仍是模板占位符） |
+
+---
+
+## Phase 0 — 收口（必须先做，0.5 个工作日）
+
+**目标**：把现有工作落地成可回滚的历史，之后每一步都从干净起点开始。
+
+| # | 动作 | 涉及 | 验收 |
+| --- | --- | --- | --- |
+| 0.1 | 拆 4 个 commit：packs 选择器+批处理接线 / 台账分片 / 入口清单+分组 / 全量修复+仓库整理 | 24 个文件 | `git log` 四个主题清晰，每个 commit 树可 import |
+| 0.2 | 推 `fork/main` | — | 远端哈希 = 本地 |
+| 0.3 | 记录基线快照到 `docs/audits/records/` | 新文件 | 上述表格成为可比对的数字 |
+
+**风险**：无。**回滚**：`git reset --hard` 到 `83b59e8`。
+
+---
+
+## Phase 1 — 补完"分类-执法"这条线（1–2 个工作日，纯增量）
+
+这一 Phase 不加任何行为，只让"以后不会越来越多"从口号变成门禁。
+
+### 1.1 包根 79 个模块的分组归类
+
+**问题**：`root_module_ratchet` 只冻结 79 个**名字**，`directory-map.md` 的 43 组声称
+覆盖全部 336 个模块，但**没有人管这 79 个文件各属于哪一组**——一个冻结集合没有分类，
+读了还是不知道它是干嘛的。
+
+**做法**：
+- `scripts/root_module_manifest.json` 新增 `groups`，每组 `purpose` + 文件列表
+- `scripts/root_module_ratchet.py` 加规则：每个包根模块恰好属于一组；组声明的文件必须存在
+- `docs/directory-map.md` 增加"包根模块分组"表
+- 测试：`tests/governance/test_root_module_ratchet.py` 补 5 例（未归组 / 归两组 / 组缺 purpose / 声明了不存在的文件 / 全声明通过）
+
+**验收**：棘轮绿；`--detail` 能打印 79 个模块的组别。
+
+### 1.2 `dispatch` 的进程内缓存
+
+**问题**：`dispatch.resolve_capability_entrypoint()` 每次都 `load_registry()` = 读 + 校验
+manifest。100 个账号的批处理会读 100 次（每次约 1–2 ms，合计 100–200 ms 纯开销）。
+
+**做法**：`packs/loader.py` 加 `load_registry` 的进程内缓存，key 用「builtin 目录 +
+`GPT_PACK_PATH` + 每个 manifest 的 `(mtime, size)`」，命中直接返回；文件一变自动失效。
+**不能用无 key 的全局缓存**——测试要 monkeypatch 注册表，必须能绕过。
+
+**验收**：新增测试证明「第二次调用不再读文件」「manifest 改动后失效」「显式传入
+registry 时永不缓存」；性能上批处理里 `load_registry` 调用次数降到 1。
+
+### 1.3 `--pack` 打通到桌面
+
+**问题**：CLI 有 `--pack`，但 `SmsWorkbench.Contracts/BackendCommandPlanner.cs` 没有
+对应参数，桌面端无法选择架构。`tests/workbench/test_backend_cli_contract.py` 只断言
+**C#→Python** 方向，所以这个缺口不会被现有门禁发现。
+
+**做法**：
+- `BackendCommandPlanner` 增加 `withPack(plan, packId)`（唯一允许拼 `--pack` 的地方）
+- 设置页"注册与接码"分类下加"注册架构"下拉，数据源改成 `--pack-list` 的 IPC payload
+- 补测试：C# 侧断言 planner 产出正确参数；契约测试覆盖新 flag
+
+**验收**：桌面能选 pack；`pack-list` 的 JSON 被 C# 反序列化（新 DTO 进 Contracts）。
+
+### 1.4 文档索引补漏
+
+`docs/README.md` 的 Core documents 没有 `provider-packs.md` 和 `entry-points.md`。
+
+---
+
+## Phase 2 — 把能力真正接线（P2 收尾，3–5 个工作日）
+
+**问题**：manifest 声明 6 个能力，只有 `account.health` 有生产调用方。这是"骨架没通电"
+的根源。入口点也已有 4 个（`register_email` / `register_batch` / `account_liveness` /
+`registration_preflight`），但只有 1 个被 dispatch 使用。
+
+| # | 能力 | dispatch 点 | 注意 |
+| --- | --- | --- | --- |
+| 2.1 | `session.access_token` | `probe_access_token` 阶段 + `--refresh-*` 的探活 | 注册结果判定就是它，改动必须带对等测试 |
+| 2.2 | `mailbox.otp` | `mailbox/service.py` 的取码入口 | 同一批要覆盖 8 类邮箱源 |
+| 2.3 | `payment.link` | `commands/payment_links.py` → `pay_link` registry | 与既有 `pay_link` 注册表并存，别造第二套注册表 |
+| 2.4 | `account.registration.email` | `cli._main_registration_pipeline` 的 `run_email`/`run_batch` | 最大的一条；先做 `run_email` 单账号，批量留到 2.5 |
+| 2.5 | `payment.batch` + 批量注册 | `batch_runner` 入口 | 需要先有 2.4 |
+
+**每个能力的固定三件套测试**（照 `account.health` 的样子）：
+1. 对象同一性：解析出的 callable `is` 工作流原本 import 的那个
+2. 注入生效：`probe_fn=`/对应参数注入后被真正调用
+3. 歧义：两个 pack 声明同能力 → 报错并点名 `--pack` / `GPT_PACK_ID`
+
+**约束（重要）**：`import-layer` 每个目录对的 import 条数冻结，只许降。新增 dispatch
+点一律走**「命令层解析 + 关键字注入」**，不新增跨目录 import 边。若某处必须新增边，
+先做一次显式的预算决策，不允许 `importlib` 绕静态图。
+
+### 2.6 台账的 code↔ledger 双向校验（pack 作用域）
+
+现在 `packs.<id>.toggles` 只有形状与 pack 存在性校验，**证明不了代码真的读了开关**。
+补一个 pack 作用域的 flag reader（例如 `packs/flags.py`，读 `packs.<id>.<key>`），
+然后把 `experiment_ratchet` 的 `code_reads` 扫到 pack 目录，双向对齐。
+
+---
+
+## Phase 3 — 第二套架构（P4，唯一能证明抽象成立的事，5–8 个工作日）
+
+**为什么必须做**：只有一个 pack 时，任何"通用工作流"都是按一个样本猜的抽象。P3 之前
+必须有第二套跑通，否则迁移是在给未验证的抽象交学费（ADR-0015 已写明）。
+
+| # | 动作 |
+| --- | --- |
+| 3.1 | 选目标平台：需能自助注册 + 有邮件验证 + 可接受自动化。要同时评估**合规边界**（见"不做的事"） |
+| 3.2 | `python scripts/pack_new.py --id <vendor>.<platform>` 生成骨架 |
+| 3.3 | 填 `platforms/<short>/flow.py`：`preflight`（verify 钩子）+ `register_email`，返回共享结果形状 |
+| 3.4 | 风险词汇接进 `failure_registry`（现在 `risk_signals` 只是数据，没进分类器） |
+| 3.5 | 对等测试：同一批邮箱在 `--pack openai.chatgpt` 与 `--pack <new>` 下互不干扰 |
+| 3.6 | 真实跑 3–5 个账号，证明不是纸面架构 |
+
+**验收**：`--pack-list` 两个 active pack；`--pack-verify` 全绿；两套架构各自的测试
+互不 import。
+
+---
+
+## Phase 4 — 迁移存量（P3，5–10 个工作日，高风险）
+
+**目标**：把 ChatGPT 的实现从 `registration/` 迁进 `platforms/chatgpt/`，manifest 改指向。
+
+**分步**（每步独立可回滚）：
+1. `auth_flow/` 整包平移（纯移动 + import 重写，`import_layer_baseline` 会变，需显式重建基线并记录理由）
+2. `registration/` 的阶段体（bootstrap/identity/auth/register/otp/account/sentinel/resume）逐个平移
+3. `sentinel/` 保持原位（它是共享的签发器，不是某套架构私有）
+4. manifest 的 `entrypoints` 改指向新位置 + 对等测试
+5. 删除 `registration/orchestrator.py` 的兼容 re-export？**不**——保留为 facade
+
+**风险**：这是全仓最大的结构变更，`import_layer_ratchet` / `delayed_import_ratchet` /
+`provider_decoupling_ratchet` 三张基线都会动。**必须每个子步一个 commit**，全量绿
+才继续。
+
+---
+
+## Phase 5 — 产品面（P5，3–5 个工作日）
+
+| # | 动作 |
+| --- | --- |
+| 5.1 | 桌面按 `capabilities` 渲染：声明 `payment.link` 才显示支付页，声明 `mailbox.otp` 才显示接码 |
+| 5.2 | 命名收敛：`--pack` 与 `--provider` 二选一（建议保留 `--pack`，`provider` 已被邮箱/短信 provider 占用） |
+| 5.3 | `docs/current/cli-reference.md` / `ui-architecture.md` 同步 |
+
+---
+
+## Phase 6 — 技术债退坡（持续，按仓库既有节奏）
+
+**只按单文件退，不批量**——仓库审计已记录批量清理失败两次并整批回滚。
+
+| 债 | 现状 | 目标 |
+| --- | --- | --- |
+| unused import | 256（基线 257） | 每轮拿 1–2 个文件清零，`--update-baseline` 降 |
+| broad except | 959 / 158 silent（预算 960/158） | 按 lane 逐条窄化到 `TRANSPORT_ERRORS`，标记 `# broad-except:` |
+| deferred import | 212 | 能提到模块级的提；提不了的保持并留理由 |
+| same-named divergent | 34 | 逐对判断是"分层"还是"复制" |
+
+---
+
+## Phase 7 — 回答最初的问题：账号级风控（1–2 个工作日 + 成本）
+
+这是**唯一还没有数据支撑的结论**。仓库里有 4 份历史证据（10-11 掉号、10-12 修好、
+10-23 存活 142 分钟、10-31 59 号曲线），但都不在你当前的出口/邮箱组合上。
+
+| # | 动作 | 成本 |
+| --- | --- | --- |
+| 7.1 | 填真住宅代理（ipwo/proxylane）+ `python scripts/proxy_pool_probe.py --require-clean` | 代理订阅 |
+| 7.2 | 备一个真邮箱源（ReMail 或 iCloud 接码） | 邮箱成本 |
+| 7.3 | `--buy-remail-mailbox --target-at200 --count 3 --workers 1` | 3 个号 |
+| 7.4 | `python scripts/at_survival_watch.py --ids <ids> --schedule-minutes 1,5,15,30,60,120` | — |
+| 7.5 | 结论写 `docs/audits/scans/`，把"条件性风控"从推断变成实测 | — |
+
+**注意**：仓库自己的记录说 `proxy.json` 里那三条 `YOUR_USER_custom_zone_*` 是 README
+模板，不是真凭据；不换池子这一步做不了。
+
+---
+
+## Phase 8 — 可选：内核作为独立产品（长期）
+
+三条产品线共享同一个内核，这件事在 Phase 3/4 之后才成立：
+
+- 支付协议编排引擎（`payment/` + `services/protocol-payment/` + `pay_link/`）
+- 浏览器与反风控研究台（驱动 + 指纹池 + 代理泳道 + A/B 台账 + 存活曲线）
+- 通用多平台账号自动化（`packs/` + `platforms/` + 邮箱/接码/存储）
+
+前提：内核能独立发版 = `packs/` 与 `platforms/` 的依赖方向必须干净（现在已经是），
+且 `sms_tool` 这个名字要能改（涉及 336 个模块的 import 前缀，是一次大迁移）。
+
+---
+
+## 依赖关系
+
+```text
+Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5
+                │                      │
+                └──────────► Phase 6（可与 2/3 并行，逐文件）
+Phase 7 独立（随时可做，只差代理+邮箱）
+Phase 8 在 Phase 3/4 之后
+```
+
+**Phase 1.2（dispatch 缓存）必须在 Phase 2 之前**，否则每接一个能力就多一份重复读盘。
+
+---
+
+## 明确不做的事
+
+| 不做 | 理由 |
+| --- | --- |
+| 批量清理 256 个 unused import | 仓库审计记录：试过两次，每次整批回滚 |
+| 用 `importlib` 绕过 import-layer 棘轮 | 那是骗自己的门禁；要么显式改预算，要么改结构 |
+| 插件热重载 | 把"配置/代码版本错配"变成运行期随机故障 |
+| manifest 签名 | 外部分发渠道还不存在，签名是装饰 |
+| 在 P4（第二套架构）之前迁 ChatGPT 代码 | 给未验证的抽象交学费 |
+| 把 `retryable`/`terminal` 写进重试策略 | 处置必须留在 `registration/policy.py` 与 `failure_registry` |
+
+## 合规边界（Phase 3 选平台时先过这一关）
+
+本项目 LICENSE 是 MIT，README 写明"仅在获得授权并符合相关服务条款、地区法规及组织
+政策的场景中使用"。Phase 3 选第二套架构时，必须选**允许自动化注册**或**自有账号体系**
+的目标；若目标平台 ToS 明令禁止自动化，那这一 Phase 的产品价值必须重新评估，而不是
+默认继续。
+
+---
+
+## 每阶段的统一验收
+
+```powershell
+python -m pytest -q -n 4 --dist loadfile          # 全量
+python -m pytest -q tests/registration tests/workbench   # 顺序敏感分片
+dotnet test GPTRegisterTool.slnx -c Release
+# 然后 scripts/ 里全部 gate 组：38 个脚本逐个 exit 0
+```
+
+数字必须与上一 Phase 相同（除非本 Phase 明确要动某个基线，且理由写进 commit message
+与对应 baseline 的 `--reason`）。
