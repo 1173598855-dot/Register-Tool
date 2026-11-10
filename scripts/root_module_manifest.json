@@ -1,0 +1,123 @@
+{
+  "schema": "root_module_groups.v1",
+  "_why": "root_module_ratchet.py freezes the *names* of the 79 modules at the sms_tool package root, and docs/directory-map.md claims every module in some group -- but neither says which of those 79 belongs to which responsibility. A frozen set with no classification is a list you re-read every time. This file assigns each root module to exactly one group, so `--detail` answers what a root file is for, and a new root module cannot land unclassified.",
+  "_rules": [
+    "Every tracked sms_tool/<name>.py module appears in exactly one group.",
+    "Every declared file must still exist (a group naming deleted code fails).",
+    "Each group needs a purpose of at least 20 characters saying what it owns and what it does not.",
+    "Group names follow the wording already used by docs/directory-map.md so the two tables read alike."
+  ],
+  "groups": {
+    "Package Entrypoints and CLI Dispatch": {
+      "purpose": "Package markers plus the argparse surface that parses global options and lazily dispatches one command family per invocation; owns no command body, vendor wire protocol, persistence or config resolution (config/, cli_parsers/, commands/).",
+      "files": ["__init__.py", "__main__.py", "cli.py"]
+    },
+    "Operator Output, Logging and Environment Inspection": {
+      "purpose": "Owns the operator-visible output channels (sanitized print seam, stdout/stderr mirror, split operator/JSON log handlers), token-free correlation metadata, the offline --doctor environment self-check and the unread-config-key audit; it does not own redaction policy (kernel/sanitizer) or any workflow state.",
+      "files": [
+        "config_usage.py",
+        "diagnostics.py",
+        "doctor.py",
+        "logging_setup.py",
+        "operator_output.py",
+        "stdout_mirror.py",
+        "telemetry.py",
+        "token_telemetry.py"
+      ]
+    },
+    "Shared Utilities and Transport Primitives": {
+      "purpose": "Dependency-light helpers every lane may call: the single authority for the OpenAI host and path constants, the retrying HTTP transport with its circuit, dependency-free transport backoff, durable-write/random/timing helpers and the promotion-state vocabulary; it owns no per-provider wire protocol, retry policy or persistence.",
+      "files": ["backoff.py", "endpoints.py", "http_client.py", "promotion_states.py", "utils.py"]
+    },
+    "Browser Session, Fingerprint and Captcha Support": {
+      "purpose": "Owns everything that provisions and drives a real browser: the shared browser process pool, protocol and browser fingerprint/profile rotation, stale-profile reclaim, first-screen warm-up, human-like pacing, page-truth sidecars and the Playwright/nodriver CAPTCHA solvers; it does not own the registration state machine, the proxy authority or the payment protocol steps themselves.",
+      "files": [
+        "browser_fingerprint_pool.py",
+        "browser_pool.py",
+        "browser_profile_reclaim.py",
+        "captcha_solver.py",
+        "chatgpt_bootstrap.py",
+        "fingerprint_pool.py",
+        "humanize.py",
+        "nodriver_captcha.py",
+        "page_truth.py"
+      ]
+    },
+    "Registration Auth Protocol and Session Assembly": {
+      "purpose": "Owns the ChatGPT/OpenAI auth wire vocabulary and headers, account creation, email-OTP request strategy, Sentinel token acquisition, Codex OAuth/phone verification, phone-number registration orchestration, session refresh and canonical session-JSON assembly; it does not own batch scheduling, mailbox/phone inventory or browser automation.",
+      "files": [
+        "account_creation.py",
+        "auth_headers.py",
+        "auth_state.py",
+        "auth_wire.py",
+        "codex_oauth.py",
+        "codex_phone.py",
+        "codex_sentinel.py",
+        "http_utils.py",
+        "otp_strategy.py",
+        "phone_registration.py",
+        "sentinel_tokens.py",
+        "session_builder.py",
+        "session_refresh.py"
+      ]
+    },
+    "Registration Batch Safety and Cross-Process Gates": {
+      "purpose": "Owns whole-batch execution, the environment-failure circuit breaker and the OS file-lock slot semaphore shared by the CLI and desktop processes; per-account retry verdicts stay with registration/retry_guard and proxy health with proxy/health, so neither is implemented here.",
+      "files": ["batch_circuit_breaker.py", "batch_runner.py", "cross_process_gate.py"]
+    },
+    "Mailbox and Phone Inventory": {
+      "purpose": "Owns acquisition and polling of mailbox and phone inventory: OTP text extraction, the Outlook IMAP facade, the SMS provider registry and per-vendor clients (sms-activate handler family, NexSMS REST), the rental pool/lifecycle/config split and phone-flow proxy formatting; it does not own the OTP request shape, account persistence or the provider implementations under providers/.",
+      "files": [
+        "mail_otp.py",
+        "nexsms.py",
+        "outlook_imap.py",
+        "phone_config.py",
+        "phone_pool.py",
+        "phone_provider_lifecycle.py",
+        "phone_proxy.py",
+        "phone_reuse.py",
+        "sms_provider_adapter.py",
+        "sms_providers.py",
+        "sms_utils.py",
+        "smsbower.py"
+      ]
+    },
+    "Payment Links, Checkout and Wallet Adapters": {
+      "purpose": "Owns the canonical ChatGPT Checkout / Stripe-init contract, the PayPal link-generation facades and shared PP helpers, the wallet, GCash and offline regional-method adapters with their transports, browser-based capability fallback, the omakse and nodriver PayPal flows and the provider-neutral durable operation journal; it does not own proxy parsing (proxy/), the link state machines (pay_link/, paypal_link/) or batch execution (payment/).",
+      "files": [
+        "capability_browser.py",
+        "checkout_contract.py",
+        "gcash_provider.py",
+        "gcash_transport.py",
+        "gen_pp_link.py",
+        "nodriver_paypal.py",
+        "omakse_client.py",
+        "operation_journal.py",
+        "pp_link_helpers.py",
+        "regional_payment_adapter.py",
+        "wallet_provider.py",
+        "wallet_transport.py"
+      ]
+    },
+    "Account Data, Import/Export and Workspace Helpers": {
+      "purpose": "Owns account/session seed loading, the storage compatibility shell, Codex/CPA/SUB2API export-import, session format conversion, Ed25519 agent identity and the legacy explicit Workspace helpers; it does not own the SQLite schema/store internals, liveness probing, recovery or email-change migration.",
+      "files": [
+        "account_seed.py",
+        "agent_identity.py",
+        "codex_export.py",
+        "cpa_import.py",
+        "import_targets.py",
+        "k12_client.py",
+        "k12_identity.py",
+        "session_converter.py",
+        "storage.py",
+        "sub2api_import.py",
+        "workspace_scan.py"
+      ]
+    },
+    "Desktop Read and Event Transport": {
+      "purpose": "Owns the sanitized desktop read contract, the resident JSONL request/response server and the framed stage-event/result IPC envelope for the WPF host; it must not own registration or payment mutation, and ordinary log text must never be treated as a protocol frame here.",
+      "files": ["desktop_ipc.py", "desktop_read.py", "desktop_serve.py"]
+    }
+  }
+}

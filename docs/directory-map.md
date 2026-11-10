@@ -64,6 +64,27 @@ These directories are runtime state and are ignored by Git:
 | `.workbuddy-ai/`, IDE metadata | Tool-local metadata | Delete or ignore; project decisions belong in source-owned docs. |
 | `.zcode/`, root `gates/` | Obsolete generated state | Delete or ignore. Active process-lock slots are generated only under ignored `runtime/gates/`. |
 
+### Package-root module groups
+
+`scripts/root_module_baseline.json` freezes *which* names may sit at the package
+root; `scripts/root_module_manifest.json` says what each one is **for**. Both are
+enforced by `python scripts/root_module_ratchet.py`, which fails on an
+unclassified root module, a module in two groups, a group naming a deleted file,
+or a group whose `purpose` is a placeholder.
+
+| Group | Files | Owns |
+| --- | --- | --- |
+| Package Entrypoints and CLI Dispatch | 3 | argparse surface and lazy command dispatch; no command bodies |
+| Operator Output, Logging and Environment Inspection | 8 | output channels, log wiring, `--doctor`, unread-config audit |
+| Shared Utilities and Transport Primitives | 5 | host constants, retrying transport, backoff, small helpers |
+| Browser Session, Fingerprint and Captcha Support | 9 | browser process pool, fingerprint/profile rotation, captcha solvers |
+| Registration Auth Protocol and Session Assembly | 13 | auth wire, account creation, OTP strategy, Sentinel, session assembly |
+| Registration Batch Safety and Cross-Process Gates | 3 | batch execution, circuit breaker, cross-process slot gate |
+| Mailbox and Phone Inventory | 12 | mailbox/phone acquisition, OTP extraction, SMS vendor clients |
+| Payment Links, Checkout and Wallet Adapters | 12 | Checkout contract, PayPal facades, wallet/GCash/regional adapters |
+| Account Data, Import/Export and Workspace Helpers | 11 | account seeds, storage shell, CPA/SUB2API export-import, Workspace helpers |
+| Desktop Read and Event Transport | 3 | sanitized desktop read, resident JSONL server, IPC envelope |
+
 ## `sms_tool/` module groups
 
 | Group | Files | Boundary |
