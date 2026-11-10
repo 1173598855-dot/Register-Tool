@@ -262,6 +262,7 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 | `test_internal_exception_owner` | `(AttributeError, KeyError, TypeError)` 被判定为"手抄 `INTERNAL_EXCEPTION_TYPES`" | 该常量是 9 个类型的集合；**子集也算抄**。要么 import 常量（root 模块导入 `kernel` 要付一条已冻结的 import 边），要么保留 broad 并加 `# broad-except: compat`。本例选择后者 |
 
 | `test_sunk_copy_parity` | 只改了 `paypal_link/gen_link.py` 的 `_load_json`，`upi_link/config.py` 里逐字节相同的副本没改 → 全量红 | 碰 `upi_link` / `paypal_link` / `gen_pp_link` 里的函数前先跑 `scripts/sunk_copy_parity.py`，两侧同改（结果是白赚一处：预算再降 1） |
+| 钉住的 `never raises` 契约 | `proxy/edge_probe._response_status_code` 收窄成 `(TypeError, ValueError)` 后，`test_it_never_raises_on_a_hostile_response` 红 —— 测试注入的响应对象属性**故意抛 `RuntimeError`** | 这类"对敌意输入绝不抛出"的守卫必须保留 broad，并补 `# broad-except: compat` 标记写明理由。判据：**同文件/同函数的测试里有 `class Exploding` 之类故意炸的替身** |
 
 ⇒ 所以一片的实际产出常比候选数少：**候选 5 个，能落 4 个**；而且**每碰支付沉底副本，收益往往多一处**。
 

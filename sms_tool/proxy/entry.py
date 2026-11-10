@@ -430,7 +430,7 @@ def retarget_region(proxy: str, iso_code: str) -> str:
         return value
     try:
         parsed = urlsplit(value)
-    except Exception:
+    except (TypeError, ValueError):  # urlsplit rejects a malformed proxy itself
         return value
     username = unquote(parsed.username or "")
     password = unquote(parsed.password or "")
@@ -465,7 +465,7 @@ def rotate_session(proxy: str, iso_code: str = "") -> str:
     iso = str(iso_code or "").strip().upper()
     try:
         parsed = urlsplit(value)
-    except Exception:
+    except (TypeError, ValueError):  # urlsplit rejects a malformed proxy itself
         return value
     username = unquote(parsed.username or "")
     password = unquote(parsed.password or "")
@@ -520,7 +520,7 @@ def infer_region(proxy: str) -> str:
         return ""
     try:
         parsed = urlsplit(value)
-    except Exception:
+    except (TypeError, ValueError):  # urlsplit rejects a malformed proxy itself
         return ""
     username = unquote(parsed.username or "")
     password = unquote(parsed.password or "")

@@ -185,7 +185,7 @@ EDGE_CHALLENGE_VERDICTS = (EDGE_CHALLENGE, EDGE_NOT_CHALLENGE, EDGE_UNKNOWN)
 def _response_status_code(response: Any) -> int:
     try:
         return _as_int(getattr(response, "status_code", 0))
-    except Exception:
+    except Exception:  # broad-except: compat - a hostile response property may raise anything
         return 0
 
 

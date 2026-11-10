@@ -768,7 +768,7 @@ def _read_payment_methods_signal(
         return {}
     try:
         payload = response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # body is not JSON; no transport read here
         return {}
     if not isinstance(payload, Mapping):
         return {}
