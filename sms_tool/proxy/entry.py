@@ -25,7 +25,7 @@ import random
 import re
 import secrets
 import string
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 

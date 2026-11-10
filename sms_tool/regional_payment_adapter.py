@@ -12,7 +12,6 @@ from typing import Any, Mapping, Protocol
 from urllib.parse import urlsplit
 
 from .checkout_contract import (
-    CheckoutContractError,
     CheckoutRequestContract,
     CheckoutSessionContract,
     StripeCapabilityEvidence,

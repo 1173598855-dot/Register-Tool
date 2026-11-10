@@ -32,7 +32,6 @@ API key outside source control (``SMAILR_API_KEY`` is preferred)::
 
 from __future__ import annotations
 
-import json
 import time
 import urllib.parse
 import urllib.error

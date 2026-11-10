@@ -14,7 +14,6 @@ from .diagnostics import install_safe_stdio, safe_print
 from .desktop_ipc import emit_result
 from .kernel.paths import install_ascii_ca_bundle, output_dir, runtime_file
 from .packs import PackManifestError, admin as pack_admin, dispatch as pack_dispatch, loader as pack_loader
-from .registration_drivers.base import driver_choices
 from .kernel.sanitizer import sanitize_text
 
 

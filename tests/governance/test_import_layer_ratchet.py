@@ -444,10 +444,16 @@ def test_summary_facts_are_pinned():
         # never read in that module, and the file's own ``_failure_result`` builds the
         # failure class from ``result.setdefault`` instead. Deleting the statement is a
         # pure removal of coupling: nothing replaced it, so the count may only fall.
-        "total_module_edges": 472,
+        #
+        # 472 -> 471 and minority 46 -> 45, same day, same axis: ``cli.py`` imported
+        # ``registration_drivers.base.driver_choices`` and never used it -- the real
+        # consumer is ``cli_parsers/core.py``, which imports it directly. That closing
+        # edge was a minority direction (root module -> subpackage), so it leaves both
+        # counters.
+        "total_module_edges": 471,
         "ordered_pairs": 78,
         "mutual_pairs": 17,
-        "minority_edges": 46,
+        "minority_edges": 45,
         # 2026-10-21: 188 -> 190 when the provider ports seam (providers/ports.py)
         # took over the mailbox_pool_writer and desktop_ipc imports as delayed
         # ones. Before that, 190 -> 188 when store/connection.py stopped

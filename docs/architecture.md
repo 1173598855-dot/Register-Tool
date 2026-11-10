@@ -211,9 +211,9 @@ above.
 <!-- ratchet-numbers:begin architecture -->
 | Measure | Value |
 | --- | --- |
-| Module-level cross-directory edges | 472 |
+| Module-level cross-directory edges | 471 |
 | Directory pairs | 78 |
-| Mutual pairs / minority-direction edges | 17 / 46 |
+| Mutual pairs / minority-direction edges | 17 / 45 |
 | Delayed cross-directory edges | 307 |
 | Delayed imports in the package | 473 (baseline 473) |
 | Functions at or above 150 lines | 64 (frozen, `scripts/function_length_ratchet.py`) |

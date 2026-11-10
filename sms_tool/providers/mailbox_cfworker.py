@@ -1,5 +1,4 @@
 import argparse
-import time
 
 from ..mail_otp import _email_otp_candidate, _message_id
 from ..mailbox.types import MailboxAccount

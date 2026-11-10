@@ -11,7 +11,6 @@ from ..proxy.entry import rotate_session
 from typing import Any
 from collections.abc import Mapping
 from types import SimpleNamespace
-import json
 import uuid
 from ._extract import (
     _upi_custom_payment_method_id,

@@ -185,7 +185,7 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 
 | 债 | 开工时 | **现在（2026-11-11，13 片后）** | 目标 |
 | --- | --- | --- | --- |
-| unused import | 256（基线 257） | **131**（54 文件） | 逐文件清，`--update-baseline` 只许降 |
+| unused import | 256（基线 257） | **122**（45 文件） | 逐文件清，`--update-baseline` 只许降 |
 | broad except | 959 / 158 silent（预算 960/158） | **891 / 158（预算 891/158）** | 跨泳道结构回退先行；泳道内的宽 handler 单独立项 |
 | deferred import | 212 | 212 | 能提到模块级的提；提不了的保持并留理由 |
 | same-named divergent | 34 | 34（271 个同名 def：237 委派 / 0 相同 / 34 分歧） | 逐对判断是"分层"还是"复制" |
@@ -220,7 +220,7 @@ pyright 看不见"运行时是否需要"，两个工具各识一半。
 `MOZ_DISABLE_CONTENT_SANDBOX` 这一处，被 pyright 抓住才回滚。**改用
 `Select-String -Path sms_tool -Recurse`**。
 
-**到 2026-11-11（256 → 131），这条轴也接近边界**：剩下的 131 条集中在**六类接缝**上，
+**到 2026-11-11（256 → 122），这条轴也接近边界**：剩下的 122 条集中在**六类接缝**上，
 逐类的识别判据与样例见 `docs/audits/records/baseline-2026-11-11-platform-rollout.md` §2。
 和 broad-except 一样，再往下是**结构性决策**（要不要给 facade 补 `__all__` 让 ruff 不再报、
 要不要把 patch 面收到单一 seam 模块），不是 per-file 清理。

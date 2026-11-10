@@ -4,7 +4,6 @@
     "scripts/mailbox_pool_liveness.py": 1,
     "sms_tool/account_creation.py": 1,
     "sms_tool/accounts/account_recovery.py": 5,
-    "sms_tool/cli.py": 1,
     "sms_tool/mailbox/router.py": 7,
     "sms_tool/pay_link/adapters.py": 11,
     "sms_tool/pay_link/base.py": 9,
@@ -12,21 +11,13 @@
     "sms_tool/pay_link/normalize.py": 11,
     "sms_tool/pay_link/persistence.py": 11,
     "sms_tool/pay_link/registry.py": 6,
-    "sms_tool/payment/batch.py": 1,
     "sms_tool/paypal/orchestrator.py": 2,
-    "sms_tool/paypal/protocol.py": 1,
-    "sms_tool/paypal/reverse.py": 1,
     "sms_tool/pp_link_helpers.py": 9,
-    "sms_tool/providers/mailbox_cfworker.py": 1,
-    "sms_tool/providers/smailr_client.py": 1,
-    "sms_tool/proxy/entry.py": 1,
-    "sms_tool/regional_payment_adapter.py": 1,
     "sms_tool/registration/auth_stages.py": 1,
     "sms_tool/registration/pulse.py": 1,
     "sms_tool/registration/register_stages.py": 1,
     "sms_tool/registration_drivers/external_sessions/__init__.py": 11,
     "sms_tool/registration_drivers/external_sessions/managed.py": 1,
-    "sms_tool/upi_link/pipeline.py": 1,
     "tests/accounts/test_account_email_change.py": 2,
     "tests/accounts/test_account_promotion.py": 1,
     "tests/accounts/test_failure_registry.py": 1,
@@ -55,5 +46,5 @@
     "tests/workbench/test_cli_registration_driver.py": 1,
     "tests/workbench/test_operator_output.py": 1
   },
-  "total": 131
+  "total": 122
 }

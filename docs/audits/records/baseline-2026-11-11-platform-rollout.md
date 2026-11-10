@@ -12,8 +12,8 @@
 
 | 指标 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
-| `import-layer` 模块级边 / 目录对 | 473 / 78 | **472 / 78** | `python scripts/import_layer_ratchet.py` |
-| ↳ 其中 mutual / minority / delayed | 17 / 46 / 307 | 17 / 46 / 307 | 同上 |
+| `import-layer` 模块级边 / 目录对 | 473 / 78 | **471 / 78** | `python scripts/import_layer_ratchet.py` |
+| ↳ 其中 mutual / minority / delayed | 17 / 46 / 307 | 17 / 45 / 307 | 同上 |
 | `delayed-import` statements / edges | 473 / 362 | 473 / 362 | `python scripts/delayed_import_ratchet.py` |
 | ↳ 分类 | cycle 8 / startup 105 / provider 37 / deferred 212 | 同 | 同上 |
 | `function-length` 冻结函数 | 64 | 64（0 可收紧） | `python scripts/function_length_ratchet.py` |
@@ -27,15 +27,21 @@
 | `sunk-copy` 配对 | 3 对一致 | 3 对一致 | `python scripts/sunk_copy_parity.py` |
 | `payment-legacy` 冻结文件 | 22 | 22 | `python scripts/payment_legacy_manifest.py` |
 
-`import-layer` 唯一的变化（473 → 472）来自删掉 `registration/outcome.py` 里一条**从未被读取**的
-`from ..kernel.error_classification import classify_error`；只减不增，理由写在
-`tests/governance/test_import_layer_ratchet.py` 的固定数字注释里。
+`import-layer` 的两处变化都是**只减不增**，两处都来自删死导入：
+
+1. 473 → 472：`registration/outcome.py` 里一条从未被读取的
+   `from ..kernel.error_classification import classify_error`；
+2. 472 → 471（minority 46 → 45）：`cli.py` 里一条从未被使用的
+   `from .registration_drivers.base import driver_choices` —— 真正的消费方是
+   `cli_parsers/core.py`，它自己直接导入。
+
+理由都写在 `tests/governance/test_import_layer_ratchet.py` 的固定数字注释里。
 
 ## 2. 技术债基线（Phase 6 的两个轴）
 
 | 债 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
-| unused import | 256（基线 257） | **131**（54 文件） | `python scripts/unused_import_ratchet.py` |
+| unused import | 256（基线 257） | **122**（45 文件） | `python scripts/unused_import_ratchet.py` |
 | broad except | 959 / 158 silent（预算 960/158） | **891 / 158**（预算 891/158） | `python scripts/broad_except_ratchet.py` |
 
 两条轴的推进方式与**边界**（都已写进方案）：
@@ -43,7 +49,7 @@
 - **broad-except**：跨泳道的结构性回退（解析、类型强转、属性探测）已做完；剩下的 39 个候选
   逐个人工核对后**多数必须保留**（包的是调用 / 返回探针失败字典 / 自然元组是
   `INTERNAL_EXCEPTION_TYPES` 的子集）。再往下走是泳道级决策，不是 per-file 切片。
-- **unused-import**：剩下的 131 条集中在六类**接缝**上，按类列出。facade 一类已用**声明**
+- **unused-import**：剩下的 122 条集中在六类**接缝**上，按类列出。facade 一类已用**声明**
   而不是删除处理了两处：`upi_link/pipeline.py`（70 个名，−71）与
   `paypal_link/gen_link.py`（22 个名 + 删掉 3 条真死导入，−25），因为那些名字是
   `stages.py` / `paypal_link/__init__.py` 从该模块命名空间取走的，也是
