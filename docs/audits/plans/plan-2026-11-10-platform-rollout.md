@@ -209,6 +209,32 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 4. `unused_import_ratchet --update-baseline` + `refresh_doc_symbol_lines --apply`
    （删一行会让该文件之后所有 `file.py:NNN` 指针漂移）。
 
+### broad except 退坡实测（2026-11-11）：只有一类是安全的
+
+本轮把 959 降到 **956**（191 个文件），预算是独立的 `max_broad`，只许降。
+
+**安全的类：结构性回退，与传输无关。** `http_utils` 的三处就是这一类 ——
+`response.json()` 的解析回退、cookie jar 迭代回退。它们没有 `# broad-except:` 标记、
+不在协议泳道、也不做传输判定，按实际能抛的类型收窄即可：
+
+```python
+except (AttributeError, TypeError, ValueError):   # body 不是 JSON / 没有 .json / 形状不对
+except (AttributeError, TypeError):               # cookie jar 不可迭代 / 没有 get_dict
+```
+
+**不安全的类（实测踩到）：协议泳道里那些"宽"是有原因的。**
+
+| 候选 | 结果 |
+| --- | --- |
+| `auth_flow/login.py:287`（`_follow_continue_url` 后面，handler 只打印 "transport warning"，且该文件已导入 `TRANSPORT_ERRORS`，零新增边） | 收窄后 **16 个测试失败**：`AttributeError: 'object' object has no attribute 'get'`（`http_client.py:237`）。测试用裸 `object()` 当响应替身，正是靠这个宽 handler 吞掉。已回滚 |
+| `auth_flow/{login,otp,signup}` 其余带 `# broad-except: compat` 的 | 注释写明"must never fail the stage"；收窄会破坏它们自己的契约 |
+| `registration/preflight.py` 的几处 | 同一类：cleanup 与 probe 兜底，收窄会让探针缺陷变成代理降级 |
+
+⇒ **结论：协议泳道的宽 handler 不是"懒"，是"有理由"**（Rule 26 允许的 keep，且都在
+基线里）。要动它们必须同时改被钉住的测试（把 `object()` 替身换成真响应形状），
+那是一次 lane 级决策，不是一次 per-file 切片。所以这条轴的推进顺序是：
+**先做跨泳道的结构回退类，再单独立项处理泳道内的宽 handler。**
+
 ---
 
 ## Phase 7 — 回答最初的问题：账号级风控（1–2 个工作日 + 成本）

@@ -33,7 +33,12 @@ def _json_or_raw(response, limit: int = 500):
     """Parse response as JSON; on failure return dict with truncated raw text."""
     try:
         return response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
+        # A body that is not JSON (ValueError), a response object without .json
+        # (AttributeError) or a json() that rejects the shape (TypeError). A
+        # transport failure is not in this set on purpose: it belongs to the
+        # caller's retry layer, and swallowing it here would report a dead
+        # request as a body-shape surprise.
         return {"_raw": getattr(response, "text", "")[:limit]}
 
 
@@ -137,10 +142,13 @@ def _cookie_presence(session):
     names = set()
     try:
         names = {str(getattr(cookie, "name", cookie) or "") for cookie in session.cookies}
-    except Exception:
+    except (AttributeError, TypeError):
+        # A cookie jar that is not iterable (TypeError) or a jar object without
+        # get_dict (AttributeError). Anything else is a defect in the jar and
+        # must not be reported as "no cookies landed".
         try:
             names = set(session.cookies.get_dict())
-        except Exception:
+        except (AttributeError, TypeError):
             names = set()
     names = {name for name in names if name}
     return {
