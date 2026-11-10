@@ -805,7 +805,7 @@ def _followed_url(response: Mapping[str, Any] | str) -> str:
 def _is_http_url(value: Any) -> bool:
     try:
         parsed = urlsplit(str(value or "").strip())
-    except Exception:
+    except (TypeError, ValueError):  # urlparse rejects the value itself
         return False
     return parsed.scheme.lower() == "https" and bool(parsed.hostname)
 

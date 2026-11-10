@@ -501,7 +501,7 @@ def _upi_fetch_oaics_state(
         return {}
     try:
         data = response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # body is not JSON; no transport read here
         return {}
     return data if isinstance(data, dict) else {}
 

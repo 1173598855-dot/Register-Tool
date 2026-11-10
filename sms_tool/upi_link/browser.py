@@ -41,7 +41,7 @@ def _upi_browser_available() -> bool:
         import playwright.sync_api  # noqa: F401
 
         return True
-    except Exception:
+    except ImportError:  # the whole body is one import; "no rail" means exactly that
         return False
 
 
@@ -57,7 +57,7 @@ def _upi_browser_proxy(proxy: Any) -> dict[str, str] | None:
         return None
     try:
         parsed = urlsplit(value)
-    except Exception:
+    except (TypeError, ValueError):  # urlsplit rejects a malformed proxy itself
         return None
     if not parsed.scheme or not parsed.hostname:
         return None

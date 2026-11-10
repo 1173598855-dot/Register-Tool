@@ -939,7 +939,7 @@ def _extract_expires_at(token_data: dict[str, Any]) -> int:
     try:
         normalized = text.replace("Z", "+00:00")
         return int(datetime.fromisoformat(normalized).astimezone(timezone.utc).timestamp())
-    except Exception:
+    except (OSError, OverflowError, TypeError, ValueError):  # unparseable, or an epoch this host cannot hold
         return 0
 
 
@@ -987,7 +987,7 @@ def _as_list(value: Any) -> list[dict[str, Any]]:
 def _as_int(value: Any) -> int:
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):  # not an int
         return 0
 
 
