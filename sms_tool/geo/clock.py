@@ -38,7 +38,7 @@ def _zoneinfo():
         from zoneinfo import ZoneInfo
 
         return ZoneInfo
-    except Exception:  # pragma: no cover - Python < 3.9
+    except ImportError:  # pragma: no cover - an interpreter built without zoneinfo
         return None
 
 
@@ -53,7 +53,9 @@ def tzdata_available() -> bool:
         return False
     try:
         datetime.now(ZoneInfo("UTC"))
-    except Exception:
+    except (KeyError, OSError, ValueError):
+        # No tzdata on this host: ZoneInfo raises ZoneInfoNotFoundError, which
+        # derives from KeyError. Anything else is a defect, not a missing database.
         return False
     return True
 
@@ -126,7 +128,8 @@ def timezone_abbreviation(tz_name: str) -> str:
         return ""
     try:
         return str(datetime.now(ZoneInfo(name)).tzname() or "")
-    except Exception:
+    except (KeyError, OSError, ValueError):
+        # Unknown key (ZoneInfoNotFoundError is a KeyError) or missing tzdata.
         return ""
 
 
@@ -148,7 +151,8 @@ def utc_offset(tz_name: str) -> timedelta | None:
         return None
     try:
         return datetime.now(ZoneInfo(name)).utcoffset()
-    except Exception:
+    except (KeyError, OSError, ValueError):
+        # Unknown key (ZoneInfoNotFoundError is a KeyError) or missing tzdata.
         return None
 
 
