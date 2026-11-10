@@ -1,5 +1,9 @@
 {
   "edges": {
+    "sms_tool/payment/capability.py -> sms_tool.kernel.transport": {
+      "reason": "deferred",
+      "why": "the payment-methods signal reader catches exactly the transport errors the checkout GET can raise, so a dead request is recorded instead of being flattened into 'no methods'. The tuple lives in kernel.transport because that module exists to be the one place narrowing sites import; importing it at module scope would add an edge to the frozen sms_tool/payment -> sms_tool/kernel pair for a tuple used in two handlers"
+    },
     "sms_tool/config/schema.py -> sms_tool.payment.catalog": {
       "reason": "deferred",
       "why": "validate_config imports the catalog inside the function so sms_tool.config (imported by ~64 modules) does not pull the payment lane in at module scope"

@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import Any, cast
 from unittest.mock import patch
 
+import pytest
+
 from sms_tool import capability_browser as cb
 from sms_tool import gen_pp_link
 from sms_tool.paypal import extract as paypal_extract
@@ -163,9 +165,34 @@ def test_read_payment_methods_signal_parses_payload():
     assert get.call_args.kwargs["extra_headers"]["OAI-Device-Id"] == "device-1"
 
 
-def test_read_payment_methods_signal_degrades_to_empty():
+def test_a_transport_failure_raises_at_the_reader_and_degrades_at_the_public_method():
+    """Lane-level decision: the reader raises, the caller owns the degradation.
+
+    ``except Exception: return {}`` inside the reader made a refused proxy, a
+    re-shaped payload and a defect all read as "this account has no payment
+    methods". The reader now raises the transport error; the public transport
+    method, whose contract is "no answer", converts it to ``{}``.
+    """
+    with patch.object(gen_pp_link, "_checkout_get", side_effect=OSError("proxy refused")):
+        with pytest.raises(OSError):
+            pc._read_payment_methods_signal(access_token="at", auth_context={}, proxy="", timeout=20)
+
+        assert (
+            ChatGPTStripeCapabilityTransport().payment_methods_signal(
+                access_token="at", auth_context={}, proxy="", timeout=20
+            )
+            == {}
+        )
+
+
+def test_a_defect_is_not_reported_as_no_methods():
+    """``RuntimeError`` is not a transport error, so it must not look like an answer."""
     with patch.object(gen_pp_link, "_checkout_get", side_effect=RuntimeError("blocked")):
-        assert pc._read_payment_methods_signal(access_token="at", auth_context={}, proxy="", timeout=20) == {}
+        with pytest.raises(RuntimeError):
+            pc._read_payment_methods_signal(access_token="at", auth_context={}, proxy="", timeout=20)
+
+
+def test_a_refused_http_response_is_still_no_signal():
     with patch.object(gen_pp_link, "_checkout_get", return_value=_Resp(403, {"detail": "blocked"})):
         assert pc._read_payment_methods_signal(access_token="at", auth_context={}, proxy="", timeout=20) == {}
 
@@ -236,6 +263,28 @@ def test_signal_absent_when_transport_has_no_seam():
     )
 
     assert "payment_methods_signal" not in result
+
+
+def test_the_probe_records_why_the_signal_read_failed():
+    """A supplemental read that cannot run is recorded, not flattened into silence."""
+
+    class RefusingSignalTransport:
+        def create_checkout(self, contract, **kwargs):
+            return CheckoutSessionContract("cs_fixture", "openai_ie", "pk_live_fixture")
+
+        def stripe_init(self, contract, checkout, **kwargs):
+            return {"currency": "usd", "payment_method_types": ["paypal"], "total_summary": {"due": 0}}
+
+        def payment_methods_signal(self, **kwargs):
+            raise OSError("proxy refused")
+
+    result = payment_method_capability_probe(
+        "at", "paypal", transport=cast(Any, RefusingSignalTransport()), billing_country="US", currency="USD"
+    )
+
+    assert result["ok"] is True, "a supplemental read must never change the probe outcome"
+    assert "payment_methods_signal" not in result
+    assert result["payment_methods_signal_error"] == "payment_methods_signal_transport"
 
 
 # ---------------------------------------------------------------------------

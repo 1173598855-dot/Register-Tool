@@ -42,7 +42,7 @@
     "sms_tool/pay_link/core.py::generate_payment_link": 157,
     "sms_tool/payment/batch.py::_run_one_row": 348,
     "sms_tool/payment/batch.py::run_payment_batch": 216,
-    "sms_tool/payment/capability.py::payment_method_capability_probe": 268,
+    "sms_tool/payment/capability.py::payment_method_capability_probe": 267,
     "sms_tool/payment/routing.py::PaymentRoutePlanner.plan": 231,
     "sms_tool/paypal/orchestrator.py::auto_pay": 159,
     "sms_tool/paypal_link/gen_link.py::generate_hosted_long_url": 218,

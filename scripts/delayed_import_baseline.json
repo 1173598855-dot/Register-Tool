@@ -219,6 +219,7 @@
     "sms_tool/payment/capability.py -> sms_tool.gcash_provider": "deferred",
     "sms_tool/payment/capability.py -> sms_tool.gcash_transport": "deferred",
     "sms_tool/payment/capability.py -> sms_tool.gen_pp_link": "deferred",
+    "sms_tool/payment/capability.py -> sms_tool.kernel.transport": "deferred",
     "sms_tool/payment/capability.py -> sms_tool.paypal.extract": "deferred",
     "sms_tool/payment/capability.py -> sms_tool.pp_link_helpers": "deferred",
     "sms_tool/payment/catalog.py -> sms_tool.checkout_contract": "cycle",
@@ -422,7 +423,7 @@
     "sms_tool/pay_link/registry.py": 2,
     "sms_tool/payment/auth.py": 2,
     "sms_tool/payment/batch.py": 5,
-    "sms_tool/payment/capability.py": 9,
+    "sms_tool/payment/capability.py": 10,
     "sms_tool/payment/catalog.py": 2,
     "sms_tool/payment/egress.py": 2,
     "sms_tool/payment/qualification.py": 10,
@@ -489,10 +490,10 @@
   },
   "reasons": {
     "cycle": 8,
-    "deferred": 212,
+    "deferred": 213,
     "provider": 37,
     "startup": 105,
     "test-seam": 0
   },
-  "total": 473
+  "total": 474
 }

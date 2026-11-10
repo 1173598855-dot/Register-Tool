@@ -226,9 +226,10 @@ class ChatGPTStripeCapabilityTransport:
         GET still answers ``one_click_trial_eligible``. It never creates,
         confirms or charges anything.
         """
-        return _read_payment_methods_signal(
+        return _degrade_signal(
+            _read_payment_methods_signal,
             access_token=access_token,
-            auth_context=auth_context,
+            context=auth_context,
             proxy=proxy,
             timeout=timeout,
         )
@@ -478,6 +479,7 @@ def payment_method_capability_probe(
             require_zero=require_zero,
         )
     signal: dict[str, Any] = {}
+    signal_error = ""  # why the supplemental read failed, when it did
     fallback_used = False
     checkout_proxy_text = _proxy_text(checkout_proxy or proxy)
     try:
@@ -518,17 +520,13 @@ def payment_method_capability_probe(
         )
         wire: PaymentCapabilityTransport = transport or ChatGPTStripeCapabilityTransport()
         if callable(signal_reader):
-            try:
-                raw_signal = signal_reader(
-                    access_token=str(access_token).strip(),
-                    auth_context=context,
-                    proxy=_proxy_text(checkout_proxy or proxy),
-                    timeout=max(5, int(timeout or 45)),
-                )
-            except Exception:
-                raw_signal = {}
-            if isinstance(raw_signal, Mapping):
-                signal = dict(raw_signal)
+            signal, signal_error = _read_signal_or_reason(
+                signal_reader,
+                access_token=str(access_token).strip(),
+                context=context,
+                proxy=_proxy_text(checkout_proxy or proxy),
+                timeout=max(5, int(timeout or 45)),
+            )
         try:
             checkout = wire.create_checkout(
                 contract,
@@ -618,6 +616,8 @@ def payment_method_capability_probe(
             result["payment_methods_signal"] = signal
             if "one_click_trial_eligible" in signal:
                 result["one_click_trial_eligible"] = signal["one_click_trial_eligible"]
+        if signal_error:
+            result["payment_methods_signal_error"] = signal_error
         return result
     except CapabilityProbeError as exc:
         result = {
@@ -721,6 +721,51 @@ def _proxy_text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def _signal_failure_code(exc: BaseException) -> str:
+    """Machine code for a supplemental payment-methods read that could not run."""
+    if isinstance(exc, CapabilityProbeError):
+        return str(exc.error_code or "payment_methods_signal_failed")
+    return "payment_methods_signal_transport"
+
+
+def _read_signal_or_reason(
+    reader: Any,
+    *,
+    access_token: str,
+    context: dict[str, Any],
+    proxy: str,
+    timeout: int,
+) -> tuple[dict[str, Any], str]:
+    """Run the supplemental signal reader; a failure yields ``({}, code)``.
+
+    The read is *supplemental* -- it can only add evidence, so a transport failure
+    must not change the probe outcome. What it must not do either is become
+    indistinguishable from a real answer: ``except Exception: return {}`` reported a
+    dead request, a re-shaped payload and a defect as "this account has no payment
+    methods". So the caught set is exactly the transport errors the call can raise
+    plus this lane's own probe error, and anything else propagates to the caller's
+    ``capability_probe_unexpected`` handler where a defect belongs.
+    """
+    if not callable(reader):
+        return {}, ""
+
+    # Function-local: a module-level import would add an edge to the frozen
+    # sms_tool/payment -> sms_tool/kernel pair for a tuple used in two handlers.
+    from ..kernel.transport import TRANSPORT_ERRORS
+
+    try:
+        raw = reader(access_token=access_token, auth_context=context, proxy=proxy, timeout=timeout)
+    except (CapabilityProbeError, *TRANSPORT_ERRORS) as exc:
+        return {}, _signal_failure_code(exc)
+    return (dict(raw) if isinstance(raw, Mapping) else {}), ""
+
+
+def _degrade_signal(reader: Any, **kwargs: Any) -> dict[str, Any]:
+    """The public transport method's contract: no signal rather than no answer."""
+    signal, _reason = _read_signal_or_reason(reader, **kwargs)
+    return signal
+
+
 def _read_payment_methods_signal(
     *,
     access_token: str,
@@ -731,8 +776,13 @@ def _read_payment_methods_signal(
     """Read-only ``one_click_trial_eligible`` / method signal from ChatGPT.
 
     Independent of Checkout create: it survives a refused create and never
-    creates, confirms or charges anything. Every failure degrades to ``{}`` so
-    it can only add evidence, never change a probe outcome.
+    creates, confirms or charges anything. It **raises** on a transport failure
+    rather than answering ``{}``: the prose above used to be "every failure
+    degrades to ``{}``", which made a dead request, a re-shaped payload and a
+    defect all look like "this account has no payment methods". The two callers own
+    the degradation instead -- the capability probe records a structured
+    ``payment_methods_signal_error``, and the public transport method answers ``{}``
+    through :func:`_degrade_signal`.
     """
     from .. import gen_pp_link
 
@@ -749,17 +799,16 @@ def _read_payment_methods_signal(
     }
     if device_id:
         extra_headers["OAI-Device-Id"] = device_id
-    try:
-        response = gen_pp_link._checkout_get(
-            endpoints.CHATGPT_PAYMENT_METHODS,
-            token,
-            cookie_header,
-            _proxy_text(proxy),
-            max(5, int(timeout or 45)),
-            extra_headers=extra_headers,
-        )
-    except Exception:
-        return {}
+    # No handler here on purpose -- see the docstring: the call's failure modes
+    # belong to the caller, which either records why the read failed or degrades.
+    response = gen_pp_link._checkout_get(
+        endpoints.CHATGPT_PAYMENT_METHODS,
+        token,
+        cookie_header,
+        _proxy_text(proxy),
+        max(5, int(timeout or 45)),
+        extra_headers=extra_headers,
+    )
     try:
         status_code = int(getattr(response, "status_code", 0) or 0)
     except (TypeError, ValueError):

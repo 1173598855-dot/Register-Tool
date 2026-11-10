@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 889，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 887，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,10 +23,10 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 889 handlers (158 silent) across 184 files; whitelisted 9; budget 889/158
+broad-except: 887 handlers (158 silent) across 184 files; whitelisted 9; budget 887/158
 ```
 
-扫描得到 **36 个**候选（本轮开始时 38 个，其中 2 个已按下面的判据收窄，见 §1）。
+扫描得到 **35 个**候选（本轮开始时 38 个：§1 的两处结构回退 + §1.1 的一处泳道级决策已解决）。
 
 ## 1. 本轮**已经收窄**的 2 处（写在这里，免得被当成"还没做"）
 
@@ -38,12 +38,44 @@ broad-except: 889 handlers (158 silent) across 184 files; whitelisted 9; budget 
 这两处证明了一件事：**"结构回退"这一类并没有被做完**，只是剩下的大多属于下面 §2 的五类。
 以后拿到新代码，先按这五条扫，再按 §2 的类别表判 —— 不属于任何一类的，就该收窄。
 
-## 2. 剩下 36 处：为什么必须宽着
+### 1.1 已执行的**泳道级决策**：`payment/capability` 的补充读取（E 类 → 已解决）
+
+§3 说的第一条路（"把探针失败变成结构化错误"）已在一个点位上落地。选它是因为它同时
+满足三个条件：泳道自带错误类型（`CapabilityProbeError`）、调用方本来就有兜底、
+而且它的"宽"正是这一类难点的教科书形状。
+
+| 前 | 后 |
+| --- | --- |
+| `_read_payment_methods_signal` 里 `except Exception: return {}` | **不捕获**。传输错误向外抛；缺陷也向外抛 |
+| 调用点 `except Exception: raw_signal = {}` | `_read_signal_or_reason(...)`：只捕 `(CapabilityProbeError, *TRANSPORT_ERRORS)`，把原因变成 `payment_methods_signal_error` |
+| 公开方法 `payment_methods_signal` 直接调读者 | `_degrade_signal(...)`：同一个窄元组，仍然返回 `{}`（它的契约是"没有信号"） |
+
+**为什么这是对的**：`except Exception: return {}` 把三件不同的事压成同一句话 ——
+请求死了、payload 形状变了、代码有缺陷 —— 全都读作"这个账号没有可用支付方式"。
+现在传输失败仍然不改变探针结论（补充读取不能改变结果），但**原因被记下来了**；
+而缺陷会走到外层的 `capability_probe_unexpected`，那才是它该去的地方。
+
+**测试替身按判据更新了**（这正是泳道级决策要付的代价）：
+
+| 测试 | 改动 |
+| --- | --- |
+| `test_read_payment_methods_signal_degrades_to_empty` | 拆成三个：传输失败（`OSError`，`TRANSPORT_ERRORS` 成员）在读者处**抛**、在公开方法处降级；`RuntimeError` **抛**（缺陷不是答案）；403 仍然返回 `{}` |
+| 新增 `test_the_probe_records_why_the_signal_read_failed` | 断言 `ok is True` 且 `payment_methods_signal_error == "payment_methods_signal_transport"` |
+
+**门禁代价（都是显式处理，不是绕过）**：`broad-except` 889 → **887**；冻结函数
+`payment_method_capability_probe` 从 272 行**缩到** 267（因此按规则收紧基线，而不是放宽）；
+新增一条**有书面理由**的 deferred 边
+（`payment/capability.py -> sms_tool.kernel.transport`，写进 `delayed_import_reasons.json`）。
+
+⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
+记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
+
+## 2. 剩下 35 处：为什么必须宽着
 
 > 表的"收窄要先动"一列是**测试文件**，不是"改一行代码"：这些 handler 的宽度被行为测试
 > 或注入的替身钉住，改之前得先确认那些替身喂进去的东西是否还成立。
 
-### A. try 体调用的是别处的函数（异常面不在本文件里）— 19 处
+### A. try 体调用的是别处的函数（异常面不在本文件里）— 24 处
 
 | 位置 | try 体调用的东西 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
@@ -107,8 +139,8 @@ broad-except: 889 handlers (158 silent) across 184 files; whitelisted 9; budget 
 | `smsbower.py:207` `complete` | `self.set_status(activation_id, "6")` | `_do("setStatus", ...)` 是一次网络往返，失败要返回 False 而不是炸 | `tests/registration/test_phone_reuse_smsbower.py`（`complete` 是常用词，全仓 82 个文件命中，真实 pin 是这一个） |
 | `smsbower.py:254` `request_additional` | `self.set_status(activation_id, "3")` | 同上 | `tests/registration/test_nexsms_client_pure.py`、`test_phone_reuse_smsbower.py` |
 
-*（注：`payment/capability.py:761` `_read_payment_methods_signal` 也属这一类 —— 它的 try 体
-直接走 checkout GET。扫描器因为 `.json()` 不在 14 行窗口内没把它排除，人工归到 E 类。）*
+*（注：`payment/capability.py` 的 `_read_payment_methods_signal` 曾是这一类的第二个点位，
+现已按 §1.1 的泳道级决策解决，不再出现在候选里。）*
 
 ## 3. 想继续推进这条轴，只有两条路（都是泳道级决策）
 
@@ -120,8 +152,8 @@ broad-except: 889 handlers (158 silent) across 184 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 889，含本轮 2 处）；第二半需要
-排期，不需要重新调研。**
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 887，含本轮三处）；第二半的第一个
+点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）
 

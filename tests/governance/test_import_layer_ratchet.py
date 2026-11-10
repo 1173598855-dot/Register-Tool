@@ -523,7 +523,12 @@ def test_summary_facts_are_pinned():
         # `sms_providers` lookups in `desktop_read`. The rest came with the
         # in-flight desktop/registration refactor; every one carries an entry in
         # `delayed_import_reasons.json` where its reason is not rule-derived.
-        "delayed_cross_dir_edges": 307,
+        # 2026-11-11 (P6, lane-level): 307 -> 308. The payment-methods signal reader
+        # stopped swallowing every exception, so it needs the narrow transport tuple
+        # from kernel.transport; that import is function-local (a module-level one
+        # would add an edge to the frozen sms_tool/payment -> sms_tool/kernel pair)
+        # and its reason is recorded in delayed_import_reasons.json.
+        "delayed_cross_dir_edges": 308,
         # Imports under `if TYPE_CHECKING:` never run, so they are not runtime
         # edges. 1 here since 2026-10-23: `payment/link_manager.py` declares its
         # `pay_link` re-exports type-only (the module is not a package, so the
