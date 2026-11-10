@@ -3,9 +3,7 @@
     "scripts/batch_enable_2fa.py": 1,
     "scripts/mailbox_pool_liveness.py": 1,
     "sms_tool/account_creation.py": 1,
-    "sms_tool/accounts/account_email_change.py": 1,
     "sms_tool/accounts/account_recovery.py": 9,
-    "sms_tool/accounts/account_scan.py": 1,
     "sms_tool/batch_runner.py": 1,
     "sms_tool/browser_fingerprint_pool.py": 1,
     "sms_tool/browser_pool.py": 1,
@@ -66,7 +64,6 @@
     "tests/payment/test_paypal_proxy.py": 1,
     "tests/payment/test_protocol_payment_contract.py": 1,
     "tests/payment/test_wallet_transport.py": 1,
-    "tests/proxy/test_proxy_pool.py": 1,
     "tests/proxy/test_proxy_selection.py": 1,
     "tests/registration/test_external_registration_drivers.py": 3,
     "tests/registration/test_partial_registration_persistence.py": 1,
@@ -75,5 +72,5 @@
     "tests/workbench/test_cli_registration_driver.py": 1,
     "tests/workbench/test_operator_output.py": 1
   },
-  "total": 257
+  "total": 254
 }

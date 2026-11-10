@@ -11,7 +11,6 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pathlib import Path
 from typing import Any, Iterable
 
 from ..codex_export import _openai_refresh_token, _refresh_with_openai_oauth
