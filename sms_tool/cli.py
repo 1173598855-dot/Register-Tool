@@ -713,7 +713,7 @@ def _pack_management_command(args) -> int | None:
     ok = True
     if info_id:
         try:
-            payload = pack_admin.pack_detail(registry, info_id)
+            payload = pack_admin.pack_detail(registry, info_id, config=CFG)
         except KeyError:
             safe_print(f"unknown provider pack: {info_id}", file=sys.stderr)
             return 2

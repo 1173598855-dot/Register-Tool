@@ -212,6 +212,35 @@ packs.<pack_id>.toggles.<key> = {kind, default, status, doc, [id], [verdict], [e
 | 同一个 hypothesis id 不得被两套架构共用 | 失败即红（与注册泳道共享同一张 id 表） |
 | **代码确实读了这个开关** | **证明不了**：目前没有 pack 作用域的 flag reader。因此 `retired` 在这里被直接拒绝——没人读的键没有什么可"退役"的，记一个不可验证的状态比不记更糟 |
 
+### pack 作用域的配置读取（2026-11-11 落地）
+
+读者**不在** `sms_tool/kernel/flags.py`，也不在命令层自己算——它放在 `packs/admin.py`，
+理由有两条，都是被仓库自己的规则逼出来的：
+
+| 约束 | 结论 |
+| --- | --- |
+| `pack_boundary_ratchet` 规则 1：该包只许导入标准库 | reader 必须只用 stdlib 实现；`from ..kernel.flags import ...` 会逃出包边界（零基线，不改） |
+| `import_layer_ratchet`：`sms_tool -> sms_tool/kernel` 已顶死 35 条 | 从命令层导 kernel 要 +1 条边 → 直接红。实测过，见下 |
+
+| 层 | 谁做什么 |
+| --- | --- |
+| `packs/admin.py::pack_configured_toggles(config, pack_id)` | 唯一的 reader：逐层 `Mapping` 守卫（生产配置把每个 section 冻成 `mappingproxy`，`dict` 判断在真实运行里会静默读默认值）。**pack id 当一个键用，不按点号拆**——id 自己带点（`openai.chatgpt`），split 回来分不清 section 和 key |
+| `packs/admin.py::pack_detail(..., config=)` | 命名空间本来就由这个函数报告（`namespaces.config == "packs.<id>"`），所以"这套架构现在配了什么"归它答。`config=None`（没查）与 `{}`（查了、什么都没配）是两种不同事实，所以 `None` 时不出现该键 |
+| `cli.py` | `--pack-info` 把 `CFG` 传进去。**一行，零新增 import 边** |
+
+所以 `--pack-info <id> --json` 现在多一个 `configured_toggles` 字段。
+
+**过程中的两次修正（都留在这里，省下后来人重走）**：
+
+1. 先写成 `kernel/flags.py::dotted_value("packs.openai.chatgpt.x")` —— **点号路径表达不了 pack id**，
+   已有的 10 例测试当场红，改成按 segment 传参；
+2. 改成 kernel reader + 命令层函数内导入后，`delayed_import_ratchet` 报 `statement count 474 > 473`。
+   于是整段回退，reader 落到 `packs/admin.py`（纯 stdlib）——**两条棘轮基线一分未动**。
+
+读者有了、也有生产调用方，但**台账那条"代码确实读了"仍然没有闭环**：要证明它，需要一个
+**台账里声明的** pack 开关被代码按名字读（`retired` 才算可证）。现在台账 `packs` 段是空的，
+那一步等 P3 第二套架构带来第一个真实开关。这条状态差异写在方案 Phase 2.6 里。
+
 等某套架构真的落地一个 reader，这条检查就补上注册泳道已有的 code↔ledger 双向校验。
 
 ## 刻意不做的事

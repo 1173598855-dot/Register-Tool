@@ -121,6 +121,16 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 补一个 pack 作用域的 flag reader（例如 `packs/flags.py`，读 `packs.<id>.<key>`），
 然后把 `experiment_ratchet` 的 `code_reads` 扫到 pack 目录，双向对齐。
 
+**2026-11-11 进展（一半落地，一半仍缺输入）**：
+
+| 半 | 状态 |
+| --- | --- |
+| reader | **✅** `packs/admin.py::pack_configured_toggles(config, pack_id)` + `pack_detail(..., config=)`；`--pack-info` 多一个 `configured_toggles` 字段。10 例测试 |
+| 为什么不在 `kernel/flags.py` | 从命令层导 kernel 要给 `sms_tool -> sms_tool/kernel`（顶死 35）**加一条边**，`delayed_import_ratchet` 也报 statement 474 > 473。整段回退后落在 `packs/admin.py`：那个模块本来就报告 `namespaces.config = "packs.<id>"`，且只用 stdlib 就够——**两条基线一分未动** |
+| 为什么不在 `packs/flags.py` 新文件 | 也可以，但 `admin.py` 已经是"这套架构现在配了什么"的答案所在，多一个模块只是多一处 import 面 |
+| 一个设计错误（已修） | 起初写成点号路径 `dotted_value("packs.openai.chatgpt.x")`，但 **pack id 自带点**，split 回来分不清 section 和 key。改成把 id 当一个键查，并加一条测试钉住 |
+| 台账双向校验 | **仍缺**：要证明"代码确实读了"，必须有一个**台账声明的** pack 开关被代码按名字读；台账 `packs` 段现在是空的。`retired` 继续被拒绝（这是正确行为），等 P3 第二套架构带来第一个真实开关 |
+
 ---
 
 ## Phase 3 — 第二套架构（P4，唯一能证明抽象成立的事，5–8 个工作日）
@@ -266,6 +276,22 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 | 钉住的 `never raises` 契约 | `proxy/edge_probe._response_status_code` 收窄成 `(TypeError, ValueError)` 后，`test_it_never_raises_on_a_hostile_response` 红 —— 测试注入的响应对象属性**故意抛 `RuntimeError`** | 这类"对敌意输入绝不抛出"的守卫必须保留 broad，并补 `# broad-except: compat` 标记写明理由。判据：**同文件/同函数的测试里有 `class Exploding` 之类故意炸的替身** |
 
 ⇒ 所以一片的实际产出常比候选数少：**候选 5 个，能落 4 个**；而且**每碰支付沉底副本，收益往往多一处**。
+
+### 这条轴的安全边界（2026-11-11，14 片后已到）
+
+14 片把 **959 降到 891**（−68 处，占实测总数 7%）。重跑筛选只剩 **39 个候选**，
+而且逐个人工核对后**绝大多数必须保留 broad**，三类原因：
+
+| 类型 | 例子 | 为什么不能动 |
+| --- | --- | --- |
+| handler 里包的是**调用**而非探测 | `proxy/admin.py` 三处、`payment/qualification.py`、`upi_link/config.py:97`、`india_exit.py` 两处 | 被调函数自己会抛什么不在本文件的形状里 |
+| **探针失败结果字典** | `agent_identity` 四处、`payment/capability.py:761` | 那正是传输判定，收窄会把网络故障和逻辑缺陷混进同一个桶 |
+| 自然元组是 `INTERNAL_EXCEPTION_TYPES` 的**子集** | `account_creation.py:154`、`sentinel_tokens.py`、`auth_headers.py:470` | 元组归属门禁禁止手抄；导入常量要付一条已冻结的 import 边 |
+
+⇒ **结论：这条轴的"逐文件切片"阶段结束了。** 再往下走是**泳道级决策**（例如把
+`agent_identity` 的探针失败字典改成结构化错误、或给 `registration` 泳道单独放宽 import
+预算），不是 per-file 清理。方案原话就是"先做跨泳道的结构回退类，再单独立项处理泳道内的宽
+handler"——第一半已完成，第二半需要与 P3/P4 一起排。
 
 ---
 

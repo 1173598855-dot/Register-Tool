@@ -13,7 +13,7 @@ operator runs ``--pack-verify`` to discover.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from .contracts import LIFECYCLE_HOOKS, PackManifestError, ProviderPack
@@ -37,8 +37,43 @@ def pack_rows(registry: PackRegistry) -> list[dict[str, Any]]:
     return [pack.manifest.summary() for pack in registry.list()]
 
 
-def pack_detail(registry: PackRegistry, pack_id: str) -> dict[str, Any]:
-    """Full manifest view for one pack, including the references it declares."""
+def pack_configured_toggles(config: Any, pack_id: str) -> dict[str, Any]:
+    """The leaves under this pack's own config namespace (``packs.<id>``).
+
+    Every level is read through a ``Mapping`` guard, not a ``dict`` check: the
+    sharded production config freezes each section into a ``mappingproxy``
+    (``sms_tool/config.py::_freeze``), which is a ``Mapping`` but not a ``dict``, so a
+    ``dict`` guard would report "nothing configured" in every real run while plain
+    dict test fixtures stayed green -- the 2026-10-07 P1-D class.
+
+    The pack id is used as **one key**, not as a dotted path: ids contain dots
+    (``openai.chatgpt``), so splitting on ``.`` could not tell a section from a key.
+    """
+    packs_section = config.get("packs") if isinstance(config, Mapping) else None
+    if not isinstance(packs_section, Mapping):
+        return {}
+    section = packs_section.get(pack_id)
+    if not isinstance(section, Mapping):
+        return {}
+    return dict(sorted(section.items()))
+
+
+def pack_detail(
+    registry: PackRegistry, pack_id: str, *, config: Any = None, configured_toggles: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
+    """Full manifest view for one pack, including the references it declares.
+
+    ``config`` makes the view truthful about what this architecture currently
+    *configures*: ``--pack-info`` is how an operator sees a pack's own switches
+    without running a registration, and ``packs.<id>`` is the namespace this
+    function already reports (``detail["namespaces"]["config"]``). Pass ``None``
+    when the caller is not looking at config at all -- that is different from a pack
+    that configures nothing, which reports ``{}`` and is why the key is omitted
+    rather than faked.
+
+    ``configured_toggles`` is the direct-injection form, for a caller that resolved
+    the section itself.
+    """
     manifest = registry.get(pack_id).manifest
     detail = manifest.summary()
     detail.update(
@@ -59,6 +94,10 @@ def pack_detail(registry: PackRegistry, pack_id: str) -> dict[str, Any]:
             "missing_hooks": [hook for hook in LIFECYCLE_HOOKS if hook not in manifest.hooks],
         }
     )
+    if configured_toggles is not None:
+        detail["configured_toggles"] = dict(sorted(configured_toggles.items()))
+    elif config is not None:
+        detail["configured_toggles"] = pack_configured_toggles(config, pack_id)
     return detail
 
 
