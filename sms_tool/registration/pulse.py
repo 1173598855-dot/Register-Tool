@@ -19,7 +19,7 @@ all-at-once concurrent strategy.
 
 from __future__ import annotations
 
-import time
+import time  # noqa: F401 - patch seam: tests patch sms_tool.registration.pulse.time
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any

@@ -21,7 +21,7 @@ from . import reference_lane as _reference_lane
 from .retry_guard import DEAD_END_SIGNUP_ROUTED_TO_LOGIN
 
 if TYPE_CHECKING:
-    from .state import RegistrationWorkflow
+    from .state import RegistrationWorkflow  # noqa: F401 - annotation-only import under TYPE_CHECKING
 
 _LOGGER = logging.getLogger(__name__)
 

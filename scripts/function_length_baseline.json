@@ -3,7 +3,7 @@
   "total": 64,
   "functions": {
     "scripts/batch_enable_2fa.py::main": 288,
-    "scripts/batch_enable_2fa.py::run_one": 160,
+    "scripts/batch_enable_2fa.py::run_one": 159,
     "scripts/registration_ab.py::_rule": 192,
     "services/protocol-payment/blik/blik_qr_extract.py::run_provider_flow": 166,
     "services/protocol-payment/ideal/ideal_qr_extract.py::run_provider_flow": 175,

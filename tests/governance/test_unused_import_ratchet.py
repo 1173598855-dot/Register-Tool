@@ -54,11 +54,23 @@ def test_script_reports_ok_on_the_current_tree():
     assert "ratchet OK" in result.stdout
 
 
+def _synth(tmp_path: Path, per_file: dict[str, int]) -> Path:
+    """A baseline fixture, so the mutation tests never depend on real-tree debt."""
+    return _scratch(tmp_path, {"total": sum(per_file.values()), "per_file": per_file})
+
+
 def test_baseline_is_populated_and_self_consistent():
+    """The baseline must describe the tree it gates, empty tree included.
+
+    It used to assert ``total > 0``, which was true while the debt existed and
+    became wrong the day the last finding was declared or deleted. Consistency is
+    the property worth pinning: a baseline that says 0 while the tree has findings,
+    or lists a file the tree no longer has, is the failure that matters.
+    """
     payload = _payload()
-    assert payload["total"] > 0
-    assert payload["per_file"], "a baseline with no per-file detail cannot localise growth"
+    measured = ratchet.collect()
     assert sum(payload["per_file"].values()) == payload["total"], "total drifted from per_file"
+    assert payload["per_file"] == measured, "the baseline disagrees with the tree it gates"
 
 
 def test_baseline_is_written_with_lf_endings():
@@ -69,12 +81,8 @@ def test_baseline_is_written_with_lf_endings():
 
 def test_growth_is_detected(tmp_path, monkeypatch):
     """Mutation: lower one file's allowance and the ratchet must fail."""
-    payload = _payload()
-    victim = max(payload["per_file"], key=lambda p: payload["per_file"][p])
-    assert payload["per_file"][victim] >= 1
-    payload["per_file"][victim] -= 1
-
-    monkeypatch.setattr(ratchet, "BASELINE", _scratch(tmp_path, payload))
+    monkeypatch.setattr(ratchet, "collect", lambda: {"sms_tool/a.py": 2})
+    monkeypatch.setattr(ratchet, "BASELINE", _synth(tmp_path, {"sms_tool/a.py": 1}))
     assert ratchet.main([]) == 1, "a file that grew must fail the ratchet"
 
 
@@ -87,28 +95,18 @@ def test_missing_baseline_is_a_hard_error(tmp_path, monkeypatch):
 def test_a_shrinking_file_does_not_mask_growth(tmp_path, monkeypatch):
     """Per-file baselines are the point: a grand total would hide this.
 
-    The fixture lowers one file's allowance (growth) while raising another's
-    (slack), so the aggregate stays favourable and only a per-file check fires.
+    ``a.py`` grows 1 -> 2 while ``b.py`` carries five units of slack, so the
+    aggregate (7 allowances against 3 findings) still looks fine and only a
+    per-file check fires.
     """
-    payload = _payload()
-    grown = max(payload["per_file"], key=lambda p: payload["per_file"][p])
-    shrunk = min(payload["per_file"], key=lambda p: payload["per_file"][p])
-    if grown == shrunk:
-        return
-    payload["per_file"][grown] -= 1
-    payload["per_file"][shrunk] += 5
-
-    monkeypatch.setattr(ratchet, "BASELINE", _scratch(tmp_path, payload))
+    monkeypatch.setattr(ratchet, "collect", lambda: {"sms_tool/a.py": 2, "sms_tool/b.py": 1})
+    monkeypatch.setattr(ratchet, "BASELINE", _synth(tmp_path, {"sms_tool/a.py": 1, "sms_tool/b.py": 6}))
     assert ratchet.main([]) == 1, "growth must fail even when the aggregate looks fine"
 
 
-def test_detail_mode_lists_per_file_counts(capsys, monkeypatch):
-    monkeypatch.setattr(ratchet, "BASELINE", ratchet.BASELINE)
+def test_detail_mode_lists_per_file_counts(capsys, monkeypatch, tmp_path):
+    monkeypatch.setattr(ratchet, "collect", lambda: {"sms_tool/a.py": 3})
+    monkeypatch.setattr(ratchet, "BASELINE", _synth(tmp_path, {"sms_tool/a.py": 3}))
     assert ratchet.main(["--detail"]) == 0
     out = capsys.readouterr().out
-    # Ask the ratchet which file it considers worst instead of hardcoding one: the
-    # previous constant here was ``paypal_link/gen_link.py``, which stopped having
-    # any findings once its re-export surface was declared in ``__all__``. A test
-    # that pins "the worst file" by name has to re-pin whenever the debt moves.
-    worst = max(ratchet.collect().items(), key=lambda item: (item[1], item[0]))[0]
-    assert worst in out, f"detail output should name the worst file ({worst})"
+    assert "sms_tool/a.py" in out, "detail output should name each file with findings"

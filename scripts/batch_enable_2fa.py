@@ -413,7 +413,6 @@ def run_one(
     from sms_tool.accounts.account_recovery import _stored_registration_password
     from sms_tool.auth_flow import _login_existing_account_with_email_otp
     from sms_tool.auth_headers import (
-        auth_impersonate,
         openai_auth_headers,
         select_auth_fingerprint,
     )

@@ -47,21 +47,16 @@ from ..kernel.paths import resolve_config_file
 from ..providers import outlook_imap_client
 from ..providers import mailbox_gmail
 from ..mail_otp import (
-    candidate_is_newer,
+    candidate_is_newer,  # noqa: F401 - re-export: mailbox/strategies.py imports it from here
     _email_otp_candidate,
-    _extract_otp_from_text,
+    _extract_otp_from_text,  # noqa: F401 - re-export: mailbox/__init__ exposes it via its lazy table
     _message_id,
     _message_received_ts,
-    _message_recipients,
 )
 from ..providers import mailbox_cfworker
 from .types import MailboxAccount
 from .parsers import (
-    _looks_ms_client_id,
-    _split_chatai_client_refresh,
-    _normalize_mailbox_email,
     _parse_mailbox_token_file,
-    _parse_mailbox_password_file,
     _parse_chatai_mailbox_file,
 )
 from ..providers import mailbox_remail

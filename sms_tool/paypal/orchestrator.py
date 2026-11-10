@@ -372,8 +372,8 @@ def _try_browser_pay(
 
     if use_camoufox:
         try:
-            from camoufox.sync_api import Camoufox
-            from browserforge.fingerprints import Screen
+            from camoufox.sync_api import Camoufox  # noqa: F401 - availability probe: the import is the check
+            from browserforge.fingerprints import Screen  # noqa: F401 - availability probe: the import is the check
         except ImportError:
             print("[*] Camoufox not installed, falling back to CloakBrowser")
             use_camoufox = False

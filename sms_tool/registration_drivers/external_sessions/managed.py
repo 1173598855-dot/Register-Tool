@@ -19,7 +19,7 @@ from ..base import BrowserRegistrationError
 from ..browser_flow.decisions import DEFAULT_VIEWPORT_HEIGHT, DEFAULT_VIEWPORT_WIDTH
 from ..browser_session import PlaywrightBrowserSession
 from ..stealth import apply_playwright_stealth
-from ..platform_patches import MOZ_DISABLE_CONTENT_SANDBOX, camoufox_launch_env
+from ..platform_patches import MOZ_DISABLE_CONTENT_SANDBOX, camoufox_launch_env  # noqa: F401 - MOZ_DISABLE_CONTENT_SANDBOX is re-exported to external_sessions/__init__
 
 logger = logging.getLogger(__name__)
 

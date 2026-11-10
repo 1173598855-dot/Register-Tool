@@ -26,7 +26,7 @@ from .protocol_helpers import _safe_float, _safe_int
 from .state import RegistrationState
 
 if TYPE_CHECKING:
-    from .state import RegistrationWorkflow
+    from .state import RegistrationWorkflow  # noqa: F401 - annotation-only import under TYPE_CHECKING
 
 _LOGGER = logging.getLogger(__name__)
 

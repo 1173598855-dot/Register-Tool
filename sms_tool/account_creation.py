@@ -11,7 +11,7 @@ from .http_utils import (
     _cookie_header,
     _cookie_presence,
     _json_or_raw,
-    _minimal_chatgpt_cookie_header,
+    _minimal_chatgpt_cookie_header,  # noqa: F401 - re-export: registration/orchestrator's lazy table names it
 )
 
 _LOGGER = logging.getLogger(__name__)

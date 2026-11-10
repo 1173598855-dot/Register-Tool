@@ -15,22 +15,22 @@ import time
 import uuid
 from typing import Any
 
-from .account_identity import account_identity, resolve_account_proxy
-from .account_liveness import browser_fetch_for_account, probe_account_liveness
+from .account_identity import account_identity, resolve_account_proxy  # noqa: F401 - account_identity is re-exported to recovery_batch
+from .account_liveness import browser_fetch_for_account, probe_account_liveness  # noqa: F401 - browser_fetch_for_account likewise
 from .account_terminal import text_has_account_deactivated
 from ..config import CFG
 from ..http_client import is_transient_transport_error
-from ..proxy.routing import proxy_pool_for
+from ..proxy.routing import proxy_pool_for  # noqa: F401 - re-export: recovery_batch imports it from here
 from ..kernel.paths import runtime_file
 from ..registration.state import _stored_registration_password
 from ..storage import (
-    clear_stale_promotion_at_marker,
+    clear_stale_promotion_at_marker,  # noqa: F401 - re-export: recovery_batch imports it from here
     get_account_record,
     list_paypal_accounts,
     mark_quota_status,
     upsert_account,
 )
-from ..mailbox.quarantine import mailbox_relogin_allowed
+from ..mailbox.quarantine import mailbox_relogin_allowed  # noqa: F401 - re-export: recovery_batch imports it from here
 from ..promotion_states import (
     AUTH_INVALID_LABEL,
     PROMOTION_STATE_AUTH_INVALID,

@@ -45,7 +45,7 @@
 
 | 债 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
-| unused import | 256（基线 257） | **21**（10 文件） | `python scripts/unused_import_ratchet.py` |
+| unused import | 256（基线 257） | **0**（0 文件，轴已闭合） | `python scripts/unused_import_ratchet.py` |
 | broad except | 959 / 158 silent（预算 960/158） | **891 / 158**（预算 891/158） | `python scripts/broad_except_ratchet.py` |
 
 两条轴的推进方式与**边界**（都已写进方案）：
@@ -53,9 +53,12 @@
 - **broad-except**：跨泳道的结构性回退（解析、类型强转、属性探测）已做完；剩下的 39 个候选
   逐个人工核对后**多数必须保留**（包的是调用 / 返回探针失败字典 / 自然元组是
   `INTERNAL_EXCEPTION_TYPES` 的子集）。再往下走是泳道级决策，不是 per-file 切片。
-- **unused-import**：剩下的 21 条集中在六类**接缝**上，按类列出。`tests/` 那 32 条已全部
-  清掉（不含任何接缝：逐个确认既不是 patch 目标也不是再导出，`_browser_heartbeat` 那类
-  只在**字符串路径**里被 patch，不需要本地导入）。facade 一类已用**声明**而不是删除处理了
+- **unused-import：已闭合（257 → 0）。** 每一条都属于六类**接缝**之一，处理方式只有两种：
+  **删**（真死代码）或**就地声明**（`__all__` / `# noqa: F401` + 理由）。清零后这条轴的含义
+  变了 —— 从"冻结存量"变成"任何新增即回归"，比降到一个很小的数字更有价值。各类判据与
+  处理过程见下表。`tests/` 那 32 条不含任何接缝（逐个确认既不是 patch 目标也不是再导出，
+  `_browser_heartbeat` 那类只在**字符串路径**里被 patch，不需要本地导入）。facade 一类用
+  **声明**而不是删除处理了
   两处：`upi_link/pipeline.py`（70 个名，−71）与 `paypal_link/gen_link.py`（22 个名 +
   删掉 3 条真死导入，−25），因为那些名字是 `stages.py` / `paypal_link/__init__.py` 从该
   模块命名空间取走的，也是 `patch("sms_tool.upi_link.pipeline.<name>")` 这类目标。同一条路
@@ -82,10 +85,23 @@
 | 没有 patch、没有读者、没有再导出 | **删除**（整块 import 只服务拆分前的主模块） | 44 |
 
 这样做的副作用是**耦合数一起降**：`import-layer` 471 → 465 → 459（十二条 legacy shell →
-`payment.*`
-的死边消失），`pairs`/`minority` 不变。删除前必须先跑 pyright，因为它能看见
+`payment.*` 的死边消失），`pairs`/`minority` 不变。删除前必须先跑 pyright，因为它能看见
 `pay_link/__init__.py` 这类**反向再导出**：本轮 `parse_proxy_pool` 就是这样被抓回来的
 （`__init__` 从 `registry` 取它），现在同样就地标了 `# noqa`。
+
+### 清零后的维持规则（2026-11-11）
+
+基线现在写的是 `{"total": 0, "per_file": {}}`，所以门禁的语义变了：**任何一条新的 F401 都会
+让 `unused_import_ratchet.py` 直接红**，而不是"还没到上限"。新增导入只有三条合法路径：
+
+1. 它真的被用 —— 那 ruff 本就不该报它；
+2. 它是接缝 —— **就地声明并写理由**（`__all__` 条目，或 `# noqa: F401 - <为什么>`），
+   让下一个读者在**出问题的那一行**看到解释，而不是来这里翻表；
+3. 两者都不是 —— 删掉。
+
+同时把 `tests/governance/test_unused_import_ratchet.py` 的四个变异测试从"读真实基线、挑最大
+文件"改成**合成 fixture**：基线归零后，`max()` 会让它们失去意义。变异测试本就该自带数据，
+这一改顺带修掉了它们对仓库当前债务的隐性依赖。
 
 ## 3. 平台化落地面
 
