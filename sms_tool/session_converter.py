@@ -62,7 +62,7 @@ def parse_jwt_payload(token: str | None) -> dict[str, Any]:
         raw = base64.urlsafe_b64decode(payload.encode("ascii"))
         data = json.loads(raw.decode("utf-8"))
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except (TypeError, ValueError):  # not base64url JSON; binascii.Error derives from ValueError
         return {}
 
 
@@ -95,7 +95,7 @@ def normalize_timestamp(value: Any) -> str:
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
         return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    except Exception:
+    except (TypeError, ValueError):  # not ISO 8601; echo the input unchanged
         return text
 
 
@@ -105,7 +105,7 @@ def timestamp_from_unix_seconds(value: Any) -> str:
         if not seconds:
             return ""
         return normalize_timestamp(seconds)
-    except Exception:
+    except (TypeError, ValueError):  # not a number
         return ""
 
 
@@ -130,7 +130,7 @@ def to_unix_seconds(value: Any) -> int:
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return int(parsed.timestamp())
-    except Exception:
+    except (OSError, OverflowError, TypeError, ValueError):  # unparseable, or an epoch this host cannot hold
         return 0
 
 

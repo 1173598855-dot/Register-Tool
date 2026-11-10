@@ -18,14 +18,14 @@ def _as_bool(value):
 def _as_int(value):
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):  # not an int
         return 0
 
 
 def _as_float(value):
     try:
         return float(value)
-    except Exception:
+    except (TypeError, ValueError):  # not a number
         return 0.0
 
 
@@ -375,7 +375,7 @@ def _update_session_json(path, data):
 def _is_http_url(value):
     try:
         parsed = urlparse(str(value or ""))
-    except Exception:
+    except (TypeError, ValueError):  # urlparse rejects the value itself
         return False
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 

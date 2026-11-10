@@ -70,7 +70,7 @@ def normalize_phone(phone: str) -> str:
 def _as_price(value) -> float:
     try:
         return float(str(value or "").strip())
-    except Exception:
+    except (TypeError, ValueError):  # not a number
         return 0.0
 
 
