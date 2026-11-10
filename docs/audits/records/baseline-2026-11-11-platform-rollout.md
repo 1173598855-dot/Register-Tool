@@ -46,7 +46,7 @@
 | 债 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
 | unused import | 256（基线 257） | **0**（0 文件，轴已闭合） | `python scripts/unused_import_ratchet.py` |
-| broad except | 959 / 158 silent（预算 960/158） | **887 / 158**（预算 887/158） | `python scripts/broad_except_ratchet.py` |
+| broad except | 959 / 158 silent（预算 960/158） | **882 / 157**（预算 882/157） | `python scripts/broad_except_ratchet.py` |
 
 两条轴的推进方式与**边界**（都已写进方案）：
 

@@ -1,5 +1,9 @@
 {
   "edges": {
+    "sms_tool/agent_identity.py -> sms_tool.kernel.transport": {
+      "reason": "deferred",
+      "why": "the two agent-registration POSTs catch exactly the transport errors they can raise, so a refused proxy is reported as request_failed while a defect propagates. The tuple lives in kernel.transport because that module exists to be the one place narrowing sites import; a module-level import would add an edge to the frozen sms_tool -> sms_tool/kernel pair for a tuple used in three handlers"
+    },
     "sms_tool/payment/capability.py -> sms_tool.kernel.transport": {
       "reason": "deferred",
       "why": "the payment-methods signal reader catches exactly the transport errors the checkout GET can raise, so a dead request is recorded instead of being flattened into 'no methods'. The tuple lives in kernel.transport because that module exists to be the one place narrowing sites import; importing it at module scope would add an edge to the frozen sms_tool/payment -> sms_tool/kernel pair for a tuple used in two handlers"

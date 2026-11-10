@@ -44,6 +44,7 @@
     "sms_tool/agent_identity.py -> nacl.public": "deferred",
     "sms_tool/agent_identity.py -> nacl.signing": "deferred",
     "sms_tool/agent_identity.py -> sms_tool.codex_export": "deferred",
+    "sms_tool/agent_identity.py -> sms_tool.kernel.transport": "deferred",
     "sms_tool/agent_identity.py -> sms_tool.session_refresh": "deferred",
     "sms_tool/auth_flow/sentinel_flow.py -> sms_tool.sentinel": "provider",
     "sms_tool/auth_flow/signup.py -> sms_tool.operator_output": "deferred",
@@ -376,7 +377,7 @@
     "sms_tool/accounts/account_scan.py": 1,
     "sms_tool/accounts/promotion_batch.py": 2,
     "sms_tool/accounts/recovery_batch.py": 5,
-    "sms_tool/agent_identity.py": 6,
+    "sms_tool/agent_identity.py": 8,
     "sms_tool/auth_flow/sentinel_flow.py": 1,
     "sms_tool/auth_flow/signup.py": 1,
     "sms_tool/auth_flow/totp.py": 1,
@@ -490,10 +491,10 @@
   },
   "reasons": {
     "cycle": 8,
-    "deferred": 213,
+    "deferred": 214,
     "provider": 37,
     "startup": 105,
     "test-seam": 0
   },
-  "total": 474
+  "total": 476
 }

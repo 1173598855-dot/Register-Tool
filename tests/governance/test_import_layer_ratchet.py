@@ -528,7 +528,13 @@ def test_summary_facts_are_pinned():
         # from kernel.transport; that import is function-local (a module-level one
         # would add an edge to the frozen sms_tool/payment -> sms_tool/kernel pair)
         # and its reason is recorded in delayed_import_reasons.json.
-        "delayed_cross_dir_edges": 308,
+        # 2026-11-11 (P6, lane-level, second site): 308 -> 310. The two
+        # agent-registration POSTs stopped catching `Exception`, so both need the
+        # transport tuple from kernel.transport. Function-local for the same reason
+        # as payment/capability: a module-level import would grow the frozen
+        # sms_tool -> sms_tool/kernel pair. Reason recorded in
+        # delayed_import_reasons.json.
+        "delayed_cross_dir_edges": 310,
         # Imports under `if TYPE_CHECKING:` never run, so they are not runtime
         # edges. 1 here since 2026-10-23: `payment/link_manager.py` declares its
         # `pay_link` re-exports type-only (the module is not a package, so the

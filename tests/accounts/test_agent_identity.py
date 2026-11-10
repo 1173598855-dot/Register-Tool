@@ -20,6 +20,21 @@ def _jwt(claims):
     return f"{encode({'alg': 'none'})}.{encode(claims)}.signature"
 
 
+def _free_access_token():
+    """A free-plan account token, the shape every registration test starts from."""
+    return _jwt(
+        {
+            "exp": int(time.time()) + 3600,
+            "https://api.openai.com/auth": {
+                "chatgpt_account_id": "acct-free",
+                "chatgpt_user_id": "user-free",
+                "chatgpt_plan_type": "free",
+            },
+            "https://api.openai.com/profile": {"email": "free@example.com"},
+        }
+    )
+
+
 class AgentIdentityTests(unittest.TestCase):
     def test_create_agent_identity_builds_valid_sub2api_payload_without_retaining_at(self):
         access_token = _jwt(
@@ -204,6 +219,80 @@ class AgentIdentityTests(unittest.TestCase):
 
         self.assertTrue(result["ok"])
         self.assertEqual(result["task_id"], "task-encrypted")
+
+    def test_a_transport_failure_at_registration_is_reported_as_request_failed(self):
+        """A dead request *is* a request failure -- that is what the narrowed tuple says."""
+
+        class RefusingSession:
+            def post(self, url, **kwargs):
+                raise OSError("proxy refused")
+
+            def close(self):
+                pass
+
+        with patch.object(agent_identity, "_create_agent_registration_session", return_value=RefusingSession()):
+            result = agent_identity.create_agent_identity({"access_token": _free_access_token()})
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "agent_registration_request_failed")
+
+    def test_a_defect_at_registration_is_not_reported_as_request_failed(self):
+        """A bug used to be indistinguishable from a refused proxy (lane-level decision)."""
+
+        class BrokenSession:
+            def post(self, url, **kwargs):
+                raise RuntimeError("bug in this file")
+
+            def close(self):
+                pass
+
+        with patch.object(agent_identity, "_create_agent_registration_session", return_value=BrokenSession()):
+            with self.assertRaises(RuntimeError):
+                agent_identity.create_agent_identity({"access_token": _free_access_token()})
+
+    def test_an_unparseable_registration_body_is_invalid_json(self):
+        class FakeResponse:
+            status_code = 200
+
+            @staticmethod
+            def json():
+                raise ValueError("not json")
+
+        class FakeSession:
+            def post(self, url, **kwargs):
+                return FakeResponse()
+
+            def close(self):
+                pass
+
+        with patch.object(agent_identity, "_create_agent_registration_session", return_value=FakeSession()):
+            result = agent_identity.create_agent_identity({"access_token": _free_access_token()})
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "agent_registration_invalid_json")
+
+    def test_a_transport_failure_at_task_registration_is_reported_as_request_failed(self):
+        private_key = agent_identity.Ed25519PrivateKey.generate()
+        private_der = private_key.private_bytes(
+            agent_identity.serialization.Encoding.DER,
+            agent_identity.serialization.PrivateFormat.PKCS8,
+            agent_identity.serialization.NoEncryption(),
+        )
+        auth_json = {
+            "auth_mode": "agentIdentity",
+            "agent_identity": {
+                "agent_runtime_id": "runtime-refused",
+                "agent_private_key": base64.b64encode(private_der).decode("ascii"),
+                "account_id": "acct-free",
+                "chatgpt_user_id": "user-free",
+            },
+        }
+
+        with patch.object(agent_identity.curl_requests, "post", side_effect=OSError("proxy refused")):
+            result = agent_identity.register_agent_identity_task(auth_json, disposable_canary=True)
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"], "agent_task_registration_request_failed")
 
     def test_agent_assertion_signs_runtime_task_and_timestamp(self):
         private_key = agent_identity.Ed25519PrivateKey.generate()

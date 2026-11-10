@@ -186,7 +186,7 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 | 债 | 开工时 | **现在（2026-11-11，13 片后）** | 目标 |
 | --- | --- | --- | --- |
 | unused import | 256（基线 257） | **0**（轴已闭合） | 逐文件清，`--update-baseline` 只许降 |
-| broad except | 959 / 158 silent（预算 960/158） | **887 / 158（预算 887/158）** | 跨泳道结构回退先行；泳道内的宽 handler 单独立项 |
+| broad except | 959 / 158 silent（预算 960/158） | **882 / 157（预算 882/157）** | 跨泳道结构回退先行；泳道内的宽 handler 单独立项 |
 | deferred import | 212 | 212 | 能提到模块级的提；提不了的保持并留理由 |
 | same-named divergent | 34 | 34（271 个同名 def：237 委派 / 0 相同 / 34 分歧） | 逐对判断是"分层"还是"复制" |
 
@@ -298,21 +298,20 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 
 ⇒ 所以一片的实际产出常比候选数少：**候选 5 个，能落 4 个**；而且**每碰支付沉底副本，收益往往多一处**。
 
-### 这条轴的安全边界（2026-11-11，14 片后已到）
+### 这条轴的安全边界（2026-11-11，15 片后已到）
 
-15 片把 **959 降到 887**（−68 处，占实测总数 7%）。重跑筛选只剩 35 个候选，已逐个评审进 `docs/audits/records/broad-except-boundary-2026-11-11.md`，
+15 片把 **959 降到 882**（−77 处，约 8%）。重跑筛选只剩 35 个候选，已逐个评审进 `docs/audits/records/broad-except-boundary-2026-11-11.md`，
 而且逐个人工核对后**绝大多数必须保留 broad**，三类原因：
 
 | 类型 | 例子 | 为什么不能动 |
 | --- | --- | --- |
 | handler 里包的是**调用**而非探测 | `proxy/admin.py` 三处、`payment/qualification.py`、`upi_link/config.py:97`、`india_exit.py` 两处 | 被调函数自己会抛什么不在本文件的形状里 |
-| **探针失败结果字典** | `agent_identity` 四处、`payment/capability.py:761` | 那正是传输判定，收窄会把网络故障和逻辑缺陷混进同一个桶 |
+| **探针失败结果字典** | `agent_identity` 四处、`payment/capability.py` 的补充读取 | 返回带码的失败对象本身是对的；错的是它们**捕获了什么**。两处均已按评审 §1.1/§1.2 的模板收窄捕获集：传输失败仍是原来的码，缺陷改为向外抛 |
 | 自然元组是 `INTERNAL_EXCEPTION_TYPES` 的**子集** | `account_creation.py:154`、`sentinel_tokens.py`、`auth_headers.py:470` | 元组归属门禁禁止手抄；导入常量要付一条已冻结的 import 边 |
 
-⇒ **结论：这条轴的"逐文件切片"阶段结束了。** 再往下走是**泳道级决策**（例如把
-`agent_identity` 的探针失败字典改成结构化错误、或给 `registration` 泳道单独放宽 import
-预算），不是 per-file 清理。方案原话就是"先做跨泳道的结构回退类，再单独立项处理泳道内的宽
-handler"——第一半已完成，第二半需要与 P3/P4 一起排。
+⇒ **结论：这条轴的"逐文件切片"阶段结束了。** 再往下走是**泳道级决策**，而它的模板已经在两个
+点位上跑通（评审 §1.1 `payment/capability`、§1.2 `agent_identity`）。剩余同类点位按同一模板排期；
+另一条路（给 `registration` 泳道单独放宽 import 预算）仍然不建议，除非同时删掉别的边。
 
 ---
 

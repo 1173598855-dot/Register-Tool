@@ -76,14 +76,21 @@ def create_agent_identity(source_data, proxy="", timeout=30):
     }
     resolved_proxy = _normalize_proxy(proxy)
     session = _create_agent_registration_session(resolved_proxy)
+    # Narrow on purpose: only a transport failure means "the request failed". A
+    # defect in this function used to be reported as one too (see the lane-level
+    # template in docs/audits/records/broad-except-boundary-2026-11-11.md §1.1).
+    # Function-local import: a module-level one would add an edge to the frozen
+    # sms_tool -> sms_tool/kernel pair.
+    from .kernel.transport import TRANSPORT_ERRORS
+
     try:
         response = session.post(REGISTER_URL, **request_kwargs)
-    except Exception:
+    except TRANSPORT_ERRORS:
         return {"ok": False, "error": "agent_registration_request_failed"}
     finally:
         try:
             session.close()
-        except Exception:
+        except TRANSPORT_ERRORS:
             pass
     if response.status_code < 200 or response.status_code >= 300:
         return {
@@ -94,7 +101,7 @@ def create_agent_identity(source_data, proxy="", timeout=30):
         }
     try:
         response_data = response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # body is not JSON; no transport read here
         return {"ok": False, "error": "agent_registration_invalid_json", "status_code": response.status_code}
     runtime_id = str((response_data or {}).get("agent_runtime_id") or "").strip()
     if not runtime_id:
@@ -341,9 +348,14 @@ def register_agent_identity_task(auth_json, proxy="", timeout=30, disposable_can
     resolved_proxy = _normalize_proxy(proxy)
     if resolved_proxy:
         request_kwargs["proxies"] = {"http": resolved_proxy, "https": resolved_proxy}
+    # Same narrowing as `create_agent_identity`: only a transport failure is
+    # "the request failed". Function-local import for the same reason (frozen
+    # sms_tool -> sms_tool/kernel edge budget).
+    from .kernel.transport import TRANSPORT_ERRORS
+
     try:
         response = curl_requests.post(TASK_REGISTER_URL.format(runtime_id=runtime_id), **request_kwargs)
-    except Exception:
+    except TRANSPORT_ERRORS:
         return {"ok": False, "error": "agent_task_registration_request_failed"}
     if response.status_code < 200 or response.status_code >= 300:
         return {
@@ -354,7 +366,7 @@ def register_agent_identity_task(auth_json, proxy="", timeout=30, disposable_can
         }
     try:
         response_data = response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # body is not JSON; no transport read here
         return {"ok": False, "error": "agent_task_registration_invalid_json", "status_code": response.status_code}
     task_id = str((response_data or {}).get("task_id") or (response_data or {}).get("taskId") or "").strip()
     encrypted = str(

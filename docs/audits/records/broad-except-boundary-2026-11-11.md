@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 887，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 882，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,7 +23,7 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 887 handlers (158 silent) across 184 files; whitelisted 9; budget 887/158
+broad-except: 882 handlers (157 silent) across 184 files; whitelisted 9; budget 882/157
 ```
 
 扫描得到 **35 个**候选（本轮开始时 38 个：§1 的两处结构回退 + §1.1 的一处泳道级决策已解决）。
@@ -62,10 +62,44 @@ broad-except: 887 handlers (158 silent) across 184 files; whitelisted 9; budget 
 | `test_read_payment_methods_signal_degrades_to_empty` | 拆成三个：传输失败（`OSError`，`TRANSPORT_ERRORS` 成员）在读者处**抛**、在公开方法处降级；`RuntimeError` **抛**（缺陷不是答案）；403 仍然返回 `{}` |
 | 新增 `test_the_probe_records_why_the_signal_read_failed` | 断言 `ok is True` 且 `payment_methods_signal_error == "payment_methods_signal_transport"` |
 
-**门禁代价（都是显式处理，不是绕过）**：`broad-except` 889 → **887**；冻结函数
+**门禁代价（都是显式处理，不是绕过）**：`broad-except` 889 → **887**（本点位）；冻结函数
 `payment_method_capability_probe` 从 272 行**缩到** 267（因此按规则收紧基线，而不是放宽）；
 新增一条**有书面理由**的 deferred 边
 （`payment/capability.py -> sms_tool.kernel.transport`，写进 `delayed_import_reasons.json`）。
+
+### 1.2 第二个点位：`agent_identity` 的四处探针失败 handler
+
+同一模板的第二次应用。这四处**不在 §2 的 35 个候选里** —— 扫描的第四条把"返回带
+`ok`/`error` 的 dict"当作探针失败结果排除了，那个判断仍然正确：**返回带码的失败对象是对的**。
+错的是它们**捕获了什么**。
+
+| 位置 | 前 | 后 |
+| --- | --- | --- |
+| `create_agent_identity` 的 `session.post` | `except Exception:` → `agent_registration_request_failed` | `except TRANSPORT_ERRORS:` |
+| 同函数的 `session.close()`（`finally` 里） | `except Exception: pass` | `except TRANSPORT_ERRORS: pass` |
+| 同函数的 `response.json()` | `except Exception:` → `agent_registration_invalid_json` | `except (AttributeError, TypeError, ValueError):` |
+| `register_agent_identity_task` 的 `curl_requests.post` / `response.json()` | 同上两处 | 同上两处 |
+
+**为什么这批值得动**：`except Exception` 让"代理拒绝"和"本文件有 bug"产出**完全相同的**
+`{"ok": False, "error": "agent_registration_request_failed"}` —— 排障时会去查代理，而问题在代码里。
+现在：传输失败仍然是那个码（这是对的），缺陷则向外抛，由调用方按缺陷处理。
+
+**副作用里有一个真实收益**：`session.close()` 那处从 `except Exception: pass` 收窄后，
+`broad-except` 的 **silent 计数 158 → 157** —— 那是全仓 158 个静默 handler 里的一处。
+
+**测试**：这四处此前**没有任何用例覆盖**（`grep` 四个错误码在 tests/ 下 0 命中）。新增四条，
+替身按判据喂窄元组：
+
+| 新测试 | 断言 |
+| --- | --- |
+| `..._a_transport_failure_at_registration_is_reported_as_request_failed` | `OSError`（`TRANSPORT_ERRORS` 成员）→ `agent_registration_request_failed` |
+| `..._a_defect_at_registration_is_not_reported_as_request_failed` | `RuntimeError` → **向外抛**（`assertRaises`） |
+| `..._an_unparseable_registration_body_is_invalid_json` | `json()` 抛 `ValueError` → `agent_registration_invalid_json` |
+| `..._a_transport_failure_at_task_registration_is_reported_as_request_failed` | 任务注册路径同样返回 `agent_task_registration_request_failed` |
+
+**门禁代价**：`broad-except` 887 → **882**（silent 158 → **157**）；两处**函数内**导入
+`kernel.transport`（模块级会给已顶死的 `sms_tool -> sms_tool/kernel` 加边），理由写进
+`delayed_import_reasons.json`，固定分解事实 `delayed_cross_dir_edges` 308 → 310。
 
 ⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
 记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
@@ -152,7 +186,7 @@ broad-except: 887 handlers (158 silent) across 184 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 887，含本轮三处）；第二半的第一个
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 882，含本轮五处与四处 handler）；第二半的第一个
 点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）

@@ -274,12 +274,23 @@ def test_shipped_budget_history_is_well_formed_and_cited():
 
 
 def test_the_shipped_budget_history_matches_a_cap_that_actually_moved():
-    """Every recorded raise must be reflected in the cap it describes."""
+    """A cap may never exceed a raise that was reviewed and recorded.
+
+    The invariant is one-sided on purpose. History records *raises* ("every
+    deliberate raising of a ceiling needs an entry"), and the ratchet's other rule is
+    that a ceiling may only fall -- so a cap below a documented raise is the gate
+    working, not drift. Equality would make falling illegal: on 2026-11-11 a silent
+    handler became a narrowing one, ``max_silent`` went 158 -> 157, and an equality
+    check failed on a change the same file demands.
+    """
     policy = ratchet.load_baseline().get("policy", {})
+    documented: dict[str, int] = {}
     for entry in policy.get("budget_history", []):
-        assert policy[entry["axis"]] == entry["to"], "%s records %s -> %s but the cap is %s" % (
-            entry["date"],
-            entry["from"],
-            entry["to"],
-            policy[entry["axis"]],
+        axis = str(entry["axis"])
+        documented[axis] = max(documented.get(axis, 0), int(entry["to"]))
+
+    for axis, allowed in documented.items():
+        assert policy[axis] <= allowed, (
+            "%s is %s, above the highest recorded raise (%s); a raise needs a history entry"
+            % (axis, policy[axis], allowed)
         )
