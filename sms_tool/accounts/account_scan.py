@@ -714,7 +714,7 @@ def _jwt_plan_type(token):
             return ""
         payload = parts[1] + "=" * ((4 - len(parts[1]) % 4) % 4)
         body = json.loads(base64.urlsafe_b64decode(payload.encode("ascii")))
-    except Exception:
+    except (TypeError, ValueError):  # not base64url JSON; no transport here
         return ""
     auth = body.get("https://api.openai.com/auth") if isinstance(body, dict) else {}
     if isinstance(auth, dict):

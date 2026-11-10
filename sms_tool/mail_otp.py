@@ -106,7 +106,7 @@ def _message_received_ts(msg):
         return 0
     try:
         return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
-    except Exception:
+    except (OSError, OverflowError, TypeError, ValueError):  # unparseable or out-of-range
         return 0
 
 

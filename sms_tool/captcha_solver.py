@@ -287,7 +287,7 @@ def _playwright_proxy(proxy_url: str | None) -> Optional[dict]:
         if parsed.password:
             proxy["password"] = parsed.password
         return proxy
-    except Exception:
+    except (AttributeError, ValueError):  # parsed.port raises ValueError; no transport read here
         return None
 
 

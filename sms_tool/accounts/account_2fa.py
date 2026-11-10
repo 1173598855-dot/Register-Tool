@@ -224,7 +224,7 @@ def _mfa_info(session, access_token: str, did: str, base_headers: dict) -> dict[
         return None
     try:
         data = response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # body is not JSON; no transport read here
         return None
     return data if isinstance(data, dict) else None
 

@@ -78,7 +78,7 @@
       "silent": 1
     },
     "sms_tool/accounts/account_2fa.py": {
-      "broad": 5,
+      "broad": 4,
       "silent": 0
     },
     "sms_tool/accounts/account_email_change.py": {
@@ -110,7 +110,7 @@
       "silent": 5
     },
     "sms_tool/accounts/account_scan.py": {
-      "broad": 5,
+      "broad": 4,
       "silent": 0
     },
     "sms_tool/accounts/promotion_batch.py": {
@@ -170,7 +170,7 @@
       "silent": 0
     },
     "sms_tool/captcha_solver.py": {
-      "broad": 16,
+      "broad": 15,
       "silent": 13
     },
     "sms_tool/chatgpt_bootstrap.py": {
@@ -250,7 +250,7 @@
       "silent": 0
     },
     "sms_tool/gcash_transport.py": {
-      "broad": 6,
+      "broad": 5,
       "silent": 0
     },
     "sms_tool/geo/clock.py": {
@@ -276,10 +276,6 @@
     "sms_tool/logging_setup.py": {
       "broad": 5,
       "silent": 2
-    },
-    "sms_tool/mail_otp.py": {
-      "broad": 1,
-      "silent": 0
     },
     "sms_tool/mailbox/poll.py": {
       "broad": 1,
@@ -776,11 +772,11 @@
         "reason": "The protocol lane is where a swallowed exception is indistinguishable from a protocol failure: it lands in the funnel as 'unknown' while the batch keeps spending mailboxes. Silent handlers are 0 here and the broad count may only shrink."
       }
     },
-    "max_broad": 936,
+    "max_broad": 931,
     "max_silent": 158
   },
   "totals": {
-    "broad": 936,
+    "broad": 931,
     "silent": 158
   },
   "whitelist": {

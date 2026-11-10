@@ -326,7 +326,7 @@ def _transport_error(stage: str, exc: BaseException) -> str:
 def _response_error_detail(response: Any) -> str:
     try:
         payload = response.json()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # not a JSON body; no transport read here
         return ""
     if isinstance(payload, Mapping):
         values = [payload.get(key) for key in ("detail", "error", "message", "code")]
