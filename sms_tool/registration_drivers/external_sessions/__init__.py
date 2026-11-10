@@ -5,22 +5,21 @@ from typing import Any, Mapping
 
 from ...kernel.driver_env import driver_config as _driver_config
 from ..base import BROWSER_REGISTRATION_DRIVERS, BrowserRegistrationError, normalize_registration_driver
-from ..browser_session import PlaywrightBrowserSession, _playwright_proxy
+from ..browser_session import PlaywrightBrowserSession
 from .managed import (
     CamoufoxBrowserSession,
     CloakBrowserSession,
-    ConnectedPlaywrightSession,
     RoxyBrowserSession,
-    MOZ_DISABLE_CONTENT_SANDBOX,
-    _first,
-    _normalize_debugger_address,
-    _require,
-    _roxy_retryable,
-    apply_playwright_stealth,
-    curl_requests,
-    time,
+    # Bound in this module's namespace on purpose, none of it read here:
+    # * `curl_requests` / `time` are patch seams -- tests patch
+    #   `external_sessions.curl_requests.request` and `external_sessions.time.sleep`;
+    # * `MOZ_DISABLE_CONTENT_SANDBOX` is read by tests/registration/test_camoufox_sandbox.py
+    #   off this path.
+    MOZ_DISABLE_CONTENT_SANDBOX,  # noqa: F401 - read by tests via this path
+    curl_requests,  # noqa: F401 - patch seam
+    time,  # noqa: F401 - patch seam
 )
-from .profiles import _browser_profile_dir, _inject_browser_profile, _inject_screen_size
+from .profiles import _inject_browser_profile, _inject_screen_size
 from .probe import verify_browser_proxy_country
 
 _BROWSER_SESSION_FACTORIES: dict[str, Callable[..., PlaywrightBrowserSession]] = {

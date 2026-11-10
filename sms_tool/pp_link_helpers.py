@@ -19,19 +19,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, quote, urljoin, urlsplit
 
-import requests
-
-from .checkout_contract import CheckoutRequestContract, CheckoutSessionContract
 from .cross_process_gate import cross_process_write_lock
 from .kernel.paths import runtime_file
 from .phone_proxy import match_proxy_region, normalize_proxy_url
 
 from .paypal.proxy import (
-    PayPalProxyState,
-    infer_proxy_country,
-    is_retryable_network_error,
-    probe_proxy,
-    redact_proxy_url,
     rotate_proxy_session as rotate_stage_proxy_session,
 )
 
@@ -48,7 +40,9 @@ DEFAULT_STRIPE_PK = (os.environ.get("PP_STRIPE_PUBLISHABLE_KEY", "") or "").stri
 )
 STRIPE_VERSION = "2025-03-31.basil; checkout_server_update_beta=v1; checkout_manual_approval_preview=v1"
 from . import endpoints
-from .kernel.timeouts import CHATGPT_TIMEOUT, DEFAULT_TIMEOUT
+
+# CHATGPT_TIMEOUT is re-exported: six lanes import it from this module.
+from .kernel.timeouts import CHATGPT_TIMEOUT, DEFAULT_TIMEOUT  # noqa: F401
 
 _CHATGPT_ORIGIN_HOST = endpoints.CHATGPT_BASE
 

@@ -6,12 +6,10 @@
     "sms_tool/accounts/account_recovery.py": 5,
     "sms_tool/mailbox/router.py": 7,
     "sms_tool/paypal/orchestrator.py": 2,
-    "sms_tool/pp_link_helpers.py": 9,
     "sms_tool/registration/auth_stages.py": 1,
     "sms_tool/registration/pulse.py": 1,
     "sms_tool/registration/register_stages.py": 1,
-    "sms_tool/registration_drivers/external_sessions/__init__.py": 11,
     "sms_tool/registration_drivers/external_sessions/managed.py": 1
   },
-  "total": 41
+  "total": 21
 }
