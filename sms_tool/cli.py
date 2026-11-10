@@ -1221,7 +1221,10 @@ def _account_health_probe():
 def _quota_usage(args):
     try:
         probe_fn = _account_health_probe()
-    except pack_dispatch.CapabilityDispatchError as exc:
+    except (pack_dispatch.CapabilityDispatchError, PackManifestError) as exc:
+        # A discovered-but-broken pack must read as a preflight failure, not a
+        # traceback: `--quota-usage` is reachable from the desktop host, which
+        # renders an exit code rather than a stack.
         safe_print(f"--quota-usage: {exc}", file=sys.stderr)
         raise SystemExit(2) from None
     return account_commands.quota_usage(args, probe_fn=probe_fn)

@@ -196,3 +196,18 @@ def test_the_cli_reports_a_missing_capability_instead_of_crashing(monkeypatch: p
         cli._quota_usage(quota_args())
 
     assert excinfo.value.code == 2
+
+
+def test_the_cli_reports_a_broken_external_pack_instead_of_crashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A discovered-but-unreadable manifest is a preflight failure, not a traceback."""
+    from sms_tool.packs.contracts import PackManifestError
+
+    def broken(capability: str, entrypoint: str) -> Any:
+        raise PackManifestError("cannot read provider manifest manifest.json: unexpected token")
+
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", broken)
+
+    with pytest.raises(SystemExit) as excinfo:
+        cli._quota_usage(quota_args())
+
+    assert excinfo.value.code == 2

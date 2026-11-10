@@ -281,6 +281,24 @@ def test_a_malformed_manifest_names_the_file(tmp_path: Path) -> None:
         loader.load_registry(roots=(tmp_path,))
 
 
+def test_a_manifest_with_a_utf8_bom_still_loads(tmp_path: Path) -> None:
+    """Windows operators produce BOM'd UTF-8 by default; the JSON is still valid.
+
+    Both Notepad's "UTF-8 with BOM" and PowerShell 5.1's
+    ``Set-Content -Encoding utf8`` prepend ``EF BB BF``, and a strict ``utf-8``
+    decode rejects the whole file with "Unexpected UTF-8 BOM" even though every
+    byte of JSON after the prefix is fine.
+    """
+    pack_dir = tmp_path / "bom"
+    pack_dir.mkdir()
+    (pack_dir / loader.MANIFEST_FILENAME).write_text(json.dumps(manifest_payload(id="bom.pack")), encoding="utf-8-sig")
+    assert (pack_dir / loader.MANIFEST_FILENAME).read_bytes().startswith(b"\xef\xbb\xbf")
+
+    registry = loader.load_registry(roots=(tmp_path,))
+
+    assert "bom.pack" in registry.ids()
+
+
 # ---------------------------------------------------------------------------
 # Management surface
 # ---------------------------------------------------------------------------

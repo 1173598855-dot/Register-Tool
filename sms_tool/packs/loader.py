@@ -33,10 +33,18 @@ BUILTIN_PACK_DIR = Path(__file__).with_name("builtin")
 
 
 def load_manifest(path: str | Path) -> PackManifest:
-    """Read and validate one UTF-8 JSON manifest."""
+    """Read and validate one JSON manifest.
+
+    Decoded as ``utf-8-sig`` rather than ``utf-8``: a manifest is an
+    operator-editable data file, and on Windows both Notepad's "UTF-8 with BOM"
+    and PowerShell 5.1's ``Set-Content -Encoding utf8`` prepend an ``EF BB BF``
+    that ``utf-8`` rejects with "Unexpected UTF-8 BOM". The JSON is valid and only
+    the prefix is not, so refusing it would reject a correctly written pack for a
+    reason the message cannot make obvious. BOM-less files decode identically.
+    """
     manifest_path = Path(path)
     try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+        raw = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise PackManifestError(f"cannot read provider manifest {manifest_path.name}: {exc}") from exc
     manifest = PackManifest.from_mapping(raw)
