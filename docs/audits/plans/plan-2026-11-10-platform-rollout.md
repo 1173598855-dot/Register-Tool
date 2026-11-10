@@ -180,6 +180,28 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 | deferred import | 212 | 能提到模块级的提；提不了的保持并留理由 |
 | same-named divergent | 34 | 逐对判断是"分层"还是"复制" |
 
+### unused import 退坡实测（2026-11-11）：剩下的多数是**接缝**，不是死代码
+
+本轮把 256 降到 **238**（61 个文件），每片都先 grep 兄弟模块的 re-export
+（`from .<module> import <name>`）再动。过程中撞到两次**ruff F401 误判活接缝**：
+
+| 误判 | 真相 |
+| --- | --- |
+| `account_recovery` 的 `account_identity` / `browser_fetch_for_account` / `mailbox_relogin_allowed` / `proxy_pool_for` / `clear_stale_promotion_at_marker` | `recovery_batch` 故意 `from .account_recovery import ...`，好让测试 patch `account_recovery.*` 生效。删掉后 pyright 立刻报 5 个 unknown import symbol，已全部回滚 |
+| `pay_link/base.py` 的 `current_config_data`、`pay_link/normalize.py` 的 10 余个名字 | 这些文件存在的目的就是**让测试能 patch 这个属性名**；仓库自己的报错文案写明要 patch `sms_tool.pay_link.base.current_config_data` |
+| `mailbox/router.py` 的 7 个私有名 | `mailbox/__init__.py` 与 `strategies.py` 都从 `router` 再导出/导入它们 |
+
+⇒ **剩余 238 条的主体是刻意的 re-export / patch 面，不是债。** 继续批量删会破坏
+行为，这正是这个仓库用冻结基线而不是批量自动修复的原因。
+
+**每一片的固定做法**（四步，缺一不可）：
+
+1. `grep` 兄弟模块是否 `from .<module> import <name>`（含 tests）；
+2. 只删**整句 stdlib 导入**或无接缝的单个名字；
+3. `pyright` 必须仍是 0 error —— 它是唯一能看见跨模块接缝的检查器；
+4. `unused_import_ratchet --update-baseline` + `refresh_doc_symbol_lines --apply`
+   （删一行会让该文件之后所有 `file.py:NNN` 指针漂移）。
+
 ---
 
 ## Phase 7 — 回答最初的问题：账号级风控（1–2 个工作日 + 成本）
