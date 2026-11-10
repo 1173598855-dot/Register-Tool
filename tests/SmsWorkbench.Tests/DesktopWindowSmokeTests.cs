@@ -386,7 +386,27 @@ public sealed class DesktopWindowSmokeTests
                 var header = Assert.IsType<TextBlock>(menuItem.Template.FindName("HeaderText", menuItem));
                 Rect iconBounds = BoundsRelativeTo(icon, menuItem);
                 Rect headerBounds = BoundsRelativeTo(header, menuItem);
-                Assert.True(Math.Abs(iconBounds.Top + iconBounds.Height / 2 - (headerBounds.Top + headerBounds.Height / 2)) <= 0.5);
+                // The icon and the header are snapped to device pixels independently,
+                // and on a fractional DPI their ideal tops (11 and 9 inside a 38 DIP
+                // row) each land on half a device pixel, so they round in opposite
+                // directions and the two centres end up exactly one device pixel
+                // apart. That rounding quantum is the real tolerance, so it is
+                // expressed in device pixels: at 100% DPI this stays the strict
+                // 0.5 DIP, and at 125%/150% it allows the 0.8/0.667 DIP that one
+                // device pixel is worth. A fixed 0.5 asserted pixel-exact centring
+                // that the geometry cannot deliver off the 100% grid. The 1e-6
+                // absorbs only the binary representation of 1/1.5 (measured
+                // difference 0.66666666666666696 against a 0.6666666666666666
+                // quantum), so it cannot hide a real half-pixel of drift.
+                const double RepresentationEpsilon = 1e-6;
+                double dpi = VisualTreeHelper.GetDpi(menuItem).PixelsPerDip;
+                double centringTolerance = Math.Max(0.5, 1.0 / dpi) + RepresentationEpsilon;
+                double iconCentre = iconBounds.Top + iconBounds.Height / 2;
+                double headerCentre = headerBounds.Top + headerBounds.Height / 2;
+                Assert.True(
+                    Math.Abs(iconCentre - headerCentre) <= centringTolerance,
+                    $"icon centre {iconCentre:0.######} vs header centre {headerCentre:0.######} differs by more than "
+                        + $"{centringTolerance:0.######} DIP (dpi {dpi}, icon {iconBounds}, header {headerBounds})");
                 headerLeftEdges.Add(headerBounds.Left);
             }
             Assert.True(headerLeftEdges.Max() - headerLeftEdges.Min() <= 0.5);
