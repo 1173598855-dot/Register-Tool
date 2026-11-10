@@ -3,6 +3,13 @@ import shutil
 import sys
 from pathlib import Path
 
+# Re-exported here rather than imported from ``.ca_bundle`` at the call site:
+# ``cli.py`` already imports names from this module, and a second
+# ``sms_tool -> sms_tool/kernel`` import statement would grow a frozen
+# cross-directory edge in ``scripts/import_layer_ratchet.py``. Inside this
+# package the dependency is free.
+from .ca_bundle import install_ascii_ca_bundle  # noqa: F401
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 

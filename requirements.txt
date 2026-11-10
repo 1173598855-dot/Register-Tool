@@ -1,5 +1,10 @@
 # Core dependencies
 curl_cffi==0.16.0
+# Imported directly by `kernel/ca_bundle.py` (the ASCII trust-store bridge) and by
+# `cli.main`, not only pulled in transitively by requests/curl_cffi: libcurl opens
+# the CA file with the process ANSI code page, so the path certifi returns has to
+# be readable from this code. Declared so a fresh install cannot miss it.
+certifi>=2024.7.4
 # IANA timezone database.  Windows ships none, so ``zoneinfo.TZPATH`` is empty
 # and every ``ZoneInfo("America/New_York")`` raises.  That silently broke:
 #   - browser_fingerprint_pool: offset fell back to the hardcoded DST value

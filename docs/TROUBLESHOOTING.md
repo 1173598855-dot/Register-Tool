@@ -709,3 +709,52 @@ python -c "from sms_tool import config; print(len(config.CFG['registration']))"
 
 **处置建议**：删掉或移走那个 `config.json`。它一旦被移走，`load_merged_config()` 也不会
 回落到 legacy 分支（因为分片仍在），所以是纯清理、零行为变化。
+
+## 20. 每一个 HTTPS 请求都报 `curl: (77) error adding trust anchors`
+
+**现象**：任何走到 `curl_cffi` 的请求立刻失败，错误形如
+
+```text
+curl: (77) error adding trust anchors from locations:
+  CAfile: …\site-packages\certifi\cacert.pem CApath: none
+```
+
+`--doctor` 全绿、依赖装齐、代理通，但注册 / 测活 / 支付全部起不来。
+
+**根因**：`curl_cffi` 把自己带的 libcurl 指向 `certifi.where()` 返回的 PEM 路径，而
+libcurl 打开这个文件用的是**进程 ANSI 代码页**而不是 UTF-16。所以只要该路径含非 ASCII
+字符就无法加载 —— 典型来源是仓库位置（例如 `…\要用到的\注册机\…`）或**中文 Windows
+账户名**（`certifi` 在 `%LOCALAPPDATA%\…\site-packages` 下，账户名是中文时同样中招）。
+
+**这不是 certifi 版本问题。** 2026-11-10 实测：**同一份** `cacert.pem` 字节，放 ASCII
+路径返回 200，放中文路径报 77；`certifi 2026.2.25` 与 `2026.10.23` 表现完全一致。
+所以不要用"钉 certifi 版本"来对付它。
+
+**一眼判断**（两条命令只差 CA 路径）：
+
+```text
+python -c "from curl_cffi import requests; print(requests.get('https://example.com', impersonate='chrome', timeout=10).status_code)"
+python -c "import certifi; print(certifi.where().isascii())"
+```
+
+第一条报 77、第二条打印 `False` ⇒ 就是这个。
+
+**现在的处理**：`sms_tool/kernel/ca_bundle.py` 在进程入口把 bundle 复制到 ASCII 位置并
+导出 `CURL_CA_BUNDLE` / `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE`：
+
+- `cli.main()` 调用一次（CLI 与桌面后端都经过它）；
+- `tests/conftest.py` 调用一次（测试进程不走 `cli.main()`）。
+
+路径本来就是 ASCII 时它**什么都不做**（只多一次 `str.isascii()`），所以 CI 与正常的
+英文路径机器零开销；目标位置优先系统临时目录，其次 `%ProgramData%`、系统盘根，
+全部不可写时返回 `None` 并保持环境原样（宁可维持原状，也不把可用环境改坏）。
+副本名带内容摘要（`cacert-<sha256前16位>.pem`），换 certifi 版本会自动换文件名。
+
+**如果手工跑某个模块**（不经 `cli.main()`、也不是 pytest），自己调一次：
+
+```text
+python -c "import certifi; from sms_tool.kernel.ca_bundle import install_ascii_ca_bundle; print(install_ascii_ca_bundle(certifi.where()))"
+```
+
+或者最省事：把仓库放到纯 ASCII 路径（如 `C:\work\register-tool`）并换一个英文账户名。
+

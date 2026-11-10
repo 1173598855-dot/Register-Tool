@@ -24,6 +24,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import certifi
+
 # Must run before any `sms_tool` import: `sms_tool.config` resolves its config
 # directory at import time. Without this, the suite would read (and, through the
 # legacy-root migration, move) the operator's real credential files.
@@ -64,6 +66,15 @@ elif os.environ.get(_CONFIG_DIR_OWNER_ENV) == "1" and os.environ.get("PYTEST_XDI
     os.environ[_CONFIG_DIR_ENV] = str(_seed_test_config_dir())
 
 from sms_tool import logging_setup
+
+# The suite is the one consumer that never goes through ``cli.main()``, so it
+# opts into the same CA bridge the CLI installs. Without it, any test that makes
+# a real HTTPS request through ``curl_cffi`` fails with ``curl: (77) error adding
+# trust anchors`` when this checkout lives under a non-ASCII path. It is a no-op
+# everywhere else; see ``sms_tool/kernel/ca_bundle.py``.
+from sms_tool.kernel.ca_bundle import install_ascii_ca_bundle  # noqa: E402
+
+install_ascii_ca_bundle(certifi.where())
 
 
 @pytest.fixture(autouse=True)
