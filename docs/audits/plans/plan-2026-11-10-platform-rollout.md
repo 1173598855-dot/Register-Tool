@@ -196,9 +196,16 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 
 **每一片的固定做法**（四步，缺一不可）：
 
-1. `grep` 兄弟模块是否 `from .<module> import <name>`（含 tests）；
+1. `grep` 三处，光看 import 语句不够：
+   - 兄弟模块 `from .<module> import <name>`（含 `tests/`）；
+   - 该名字作为**字符串**出现（facade 的惰性再导出表，例如
+     `orchestrator._MODULE_EXPORTS` 里的 `"<name>": ("sms_tool.<mod>", "<name>")`）；
+   - `patch(` / `patch.object(` 的参数。
 2. 只删**整句 stdlib 导入**或无接缝的单个名字；
-3. `pyright` 必须仍是 0 error —— 它是唯一能看见跨模块接缝的检查器；
+3. `pyright` 必须仍是 0 error —— 它解析惰性再导出表，是唯一能看见第二类接缝的检查器
+   （2026-11-11 实测：`account_creation._minimal_chatgpt_cookie_header` 被
+   `orchestrator` 的字符串表引用，ruff 报 F401、grep import 语句找不到、pyright 报
+   `unknown import symbol`）；
 4. `unused_import_ratchet --update-baseline` + `refresh_doc_symbol_lines --apply`
    （删一行会让该文件之后所有 `file.py:NNN` 指针漂移）。
 
