@@ -24,17 +24,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import socket
-import struct
 import threading
 from dataclasses import dataclass, field
 from typing import Any
 
 from .entry import ProxyEntry, _SOCKS_DEFAULT_PORT, _normalize_scheme
 from .pool import (
-    _ATYP_DOMAIN,
-    _ATYP_IPV4,
-    _ATYP_IPV6,
     _CMD_CONNECT,
     _NO_AUTH,
     _REP_ADDR_NOT_SUPPORTED,

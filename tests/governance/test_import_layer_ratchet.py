@@ -439,7 +439,12 @@ def test_summary_facts_are_pinned():
         # sms_tool`` and tripped a cap the leaf never earned. Adding the node is
         # the fix; making that import function-local to dodge the counter would
         # have been the workaround.
-        "total_module_edges": 473,
+        # 2026-11-11 (P6): 473 -> 472. ``registration/outcome.py`` carried an unused
+        # ``from ..kernel.error_classification import classify_error`` -- the name was
+        # never read in that module, and the file's own ``_failure_result`` builds the
+        # failure class from ``result.setdefault`` instead. Deleting the statement is a
+        # pure removal of coupling: nothing replaced it, so the count may only fall.
+        "total_module_edges": 472,
         "ordered_pairs": 78,
         "mutual_pairs": 17,
         "minority_edges": 46,

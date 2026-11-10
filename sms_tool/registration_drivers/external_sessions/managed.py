@@ -9,7 +9,7 @@ import shutil
 import time
 import warnings
 from typing import Any, Mapping
-from urllib.parse import unquote, urlencode, urljoin, urlsplit
+from urllib.parse import unquote, urljoin, urlsplit
 
 from curl_cffi import requests as curl_requests
 

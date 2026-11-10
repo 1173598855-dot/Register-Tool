@@ -17,7 +17,6 @@ from typing import Any
 
 from ..accounts.account_liveness import probe_account_liveness
 from ..config import CFG
-from ..kernel.error_classification import classify_error
 from .policy import registration_retry_decision
 from .progress import registration_stage
 from .result import build_registration_failure_result

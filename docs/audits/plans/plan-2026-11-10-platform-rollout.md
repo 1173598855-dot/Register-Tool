@@ -185,8 +185,8 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 
 | 债 | 开工时 | **现在（2026-11-11，13 片后）** | 目标 |
 | --- | --- | --- | --- |
-| unused import | 256（基线 257） | **237**（60 文件） | 逐文件清，`--update-baseline` 只许降 |
-| broad except | 959 / 158 silent（预算 960/158） | **898 / 158（预算 898/158）** | 跨泳道结构回退先行；泳道内的宽 handler 单独立项 |
+| unused import | 256（基线 257） | **227**（55 文件） | 逐文件清，`--update-baseline` 只许降 |
+| broad except | 959 / 158 silent（预算 960/158） | **891 / 158（预算 891/158）** | 跨泳道结构回退先行；泳道内的宽 handler 单独立项 |
 | deferred import | 212 | 212 | 能提到模块级的提；提不了的保持并留理由 |
 | same-named divergent | 34 | 34（271 个同名 def：237 委派 / 0 相同 / 34 分歧） | 逐对判断是"分层"还是"复制" |
 
@@ -203,6 +203,22 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 
 ⇒ **剩余 238 条的主体是刻意的 re-export / patch 面，不是债。** 继续批量删会破坏
 行为，这正是这个仓库用冻结基线而不是批量自动修复的原因。
+
+### 第五类误判：`if TYPE_CHECKING:` 里的注解导入（2026-11-11 实测）
+
+`registration/auth_stages.py` 与 `registration/register_stages.py` 都在
+`if TYPE_CHECKING:` 下导入 `RegistrationWorkflow`，ruff 报 F401（因为文件有
+`from __future__ import annotations`，注解不会在运行时求值）。**这类绝对不能删**：
+删了运行时无影响，但 pyright 立刻失去类型解析。
+
+⇒ 判据：**导入所在的作用域是 `if TYPE_CHECKING:`** → 一律不动。ruff 看不见作用域，
+pyright 看不见"运行时是否需要"，两个工具各识一半。
+
+**另外一个过程教训（本轮踩到）**：接缝 grep 用 `Select-String -Path sms_tool\**\*.py`
+在 PowerShell 下**不递归展开**，会漏掉 `sms_tool/<a>/<b>/<c>.py` 这种深路径里的反向导入。
+本轮因此放过了 `external_sessions/__init__.py` 从 `managed.py` 反向导入
+`MOZ_DISABLE_CONTENT_SANDBOX` 这一处，被 pyright 抓住才回滚。**改用
+`Select-String -Path sms_tool -Recurse`**。
 
 **每一片的固定做法**（四步，缺一不可）：
 

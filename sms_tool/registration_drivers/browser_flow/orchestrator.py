@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 from . import decisions, dom_fields, flow_steps, form_steps, page_state, recovery, session
 from .context import prepare_browser_context
 
-from ... import browser_fingerprint_pool, chatgpt_bootstrap, storage
+from ... import browser_fingerprint_pool, chatgpt_bootstrap
 from ...registration import outcome as registration_outcome
 from ...registration import progress as registration_progress
 from ...registration import result as registration_result
