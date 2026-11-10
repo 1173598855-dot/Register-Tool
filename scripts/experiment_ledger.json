@@ -19,9 +19,15 @@
     "`review_date` is a batch review date. All open entries share it on purpose: the backlog is",
     "reviewed together twice a year, and a per-switch date nobody measured would be invented.",
     "String-valued switches (registration.preflight_login_page) are out of scope here: they are",
-    "not read through the boolean flag helpers, so this file could not prove anything about them."
+    "not read through the boolean flag helpers, so this file could not prove anything about them.",
+    "",
+    "packs.<pack_id>.toggles -- the same decision shape for a registration architecture other",
+    "than the built-in one. The pack id must be a bundled pack, so a section for a retired",
+    "architecture fails instead of lingering. 'retired' is rejected here on purpose: nothing",
+    "reads pack toggles yet, and an unread key has nothing to retire."
   ],
   "review_date": "2027-01-31",
+  "packs": {},
   "dynamic_call_sites": [
     {
       "file": "sms_tool/registration/warmup.py",

@@ -224,3 +224,85 @@ def test_a_missing_ledger_is_reported_instead_of_passing(sandbox: Path):
     ratchet.LEDGER.unlink()
 
     assert _check(sandbox) == ["experiment_ledger.json: missing"]
+
+
+# --------------------------------------------------------------------------
+# pack-scoped toggles: the decision space for a second registration architecture
+# --------------------------------------------------------------------------
+
+PACK_TOGGLE = {"kind": "feature", "default": False, "status": "open", "doc": "runbook.md"}
+
+
+def _write_pack(root: Path, pack_id: str = "demo.pack") -> None:
+    directory = root / "sms_tool" / "packs" / "builtin" / "demo"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "manifest.json").write_text(json.dumps({"id": pack_id}), encoding="utf-8")
+
+
+def _write_packs(root: Path, toggles: dict, *, pack_id: str = "demo.pack") -> None:
+    _write_ledger(root, {"known_flag": dict(ENTRY)}, packs={pack_id: {"toggles": toggles}})
+
+
+def test_a_pack_section_for_a_bundled_pack_is_accepted(sandbox: Path):
+    _write_pack(sandbox)
+    _write_packs(sandbox, {"new_flow": dict(PACK_TOGGLE)})
+
+    assert _check(sandbox) == []
+
+
+def test_a_pack_section_for_an_unknown_pack_fails(sandbox: Path):
+    """A section for a retired architecture must not linger unread."""
+    _write_ledger(sandbox, {"known_flag": dict(ENTRY)}, packs={"ghost.pack": {"toggles": {}}})
+
+    failures = _check(sandbox)
+
+    assert any("no bundled pack has this id" in item and "ghost.pack" in item for item in failures), failures
+
+
+def test_a_pack_toggle_must_record_kind_status_and_default(sandbox: Path):
+    _write_pack(sandbox)
+    _write_packs(sandbox, {"new_flow": {"kind": "nope", "status": "weird"}})
+
+    failures = _check(sandbox)
+
+    assert any("kind must be one of" in item for item in failures), failures
+    assert any("status must be one of" in item for item in failures), failures
+    assert any("default must be true or false" in item for item in failures), failures
+
+
+def test_a_retired_pack_toggle_is_rejected(sandbox: Path):
+    """Nothing reads pack toggles yet, so 'retired' cannot be proven."""
+    _write_pack(sandbox)
+    _write_packs(sandbox, {"new_flow": dict(PACK_TOGGLE, status="retired")})
+
+    failures = _check(sandbox)
+
+    assert any("cannot be proven" in item for item in failures), failures
+
+
+def test_a_pack_toggle_doc_must_exist(sandbox: Path):
+    _write_pack(sandbox)
+    _write_packs(sandbox, {"new_flow": dict(PACK_TOGGLE, doc="missing.md")})
+
+    failures = _check(sandbox)
+
+    assert any("does not exist" in item for item in failures), failures
+
+
+def test_a_pack_concluded_toggle_needs_a_verdict(sandbox: Path):
+    _write_pack(sandbox)
+    _write_packs(sandbox, {"new_flow": dict(PACK_TOGGLE, status="concluded")})
+
+    failures = _check(sandbox)
+
+    assert any("concluded needs a verdict" in item for item in failures), failures
+
+
+def test_a_runbook_id_cannot_be_claimed_by_a_pack_and_the_registration_lane(sandbox: Path):
+    """One hypothesis id, one owner -- across architectures too."""
+    _write_pack(sandbox)
+    _write_packs(sandbox, {"new_flow": dict(PACK_TOGGLE, kind="ab", id="P9-9")})
+
+    failures = _check(sandbox)
+
+    assert any("already claimed" in item for item in failures), failures

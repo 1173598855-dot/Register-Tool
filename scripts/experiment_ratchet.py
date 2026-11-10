@@ -208,6 +208,121 @@ def _check_runbook(key: str, entry: dict[str, Any], runbook: str) -> list[str]:
     return failures
 
 
+def _builtin_pack_ids(root: Path) -> set[str]:
+    """``id`` of every bundled provider pack (``sms_tool/packs/builtin/*``)."""
+    ids: set[str] = set()
+    for manifest_path in sorted((root / "sms_tool" / "packs" / "builtin").glob("*/manifest.json")):
+        try:
+            payload = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        pack_id = payload.get("id") if isinstance(payload, dict) else None
+        if isinstance(pack_id, str) and pack_id.strip():
+            ids.add(pack_id.strip())
+    return ids
+
+
+def _check_pack_section(ledger: dict[str, Any], ids: dict[str, str], root: Path) -> list[str]:
+    """Validate ``packs.<pack_id>.toggles`` -- the per-architecture decision space.
+
+    A second registration architecture ships its own A/B switches, and they are
+    not ``registration.*`` keys, so the flat ``toggles`` map cannot hold them
+    without pretending one platform's experiment is another's. Each pack gets its
+    own section instead, keyed by the pack id that the manifest declares.
+
+    Two things this can prove today, and one it deliberately cannot:
+
+    * the pack id must be a bundled pack, so a section for a retired architecture
+      fails instead of lingering;
+    * the decision must be complete (kind/default/status, an ``ab`` hypothesis id,
+      a verdict once concluded, an expiry while open, a ``doc`` that exists).
+    * it cannot prove the code reads the toggle, because no pack-scoped flag
+      reader exists yet. That is why ``retired`` is rejected here: an unread key
+      has nothing to retire, and recording an unverifiable state is worse than
+      recording nothing. When a pack ships a reader, the check grows the same
+      code<->ledger direction the registration toggles already have.
+    """
+    failures: list[str] = []
+    section = ledger.get("packs")
+    if section is None:
+        return failures
+    if not isinstance(section, dict):
+        return [f"{LEDGER.name}: packs must be an object keyed by pack id"]
+
+    known = _builtin_pack_ids(root)
+    review_date = ledger.get("review_date")
+    for pack_id, pack_section in sorted(section.items()):
+        if pack_id not in known:
+            installed = ", ".join(sorted(known)) or "none"
+            failures.append(f"packs.{pack_id}: no bundled pack has this id (installed: {installed})")
+        if not isinstance(pack_section, dict):
+            failures.append(f"packs.{pack_id}: must be an object with a 'toggles' map")
+            continue
+        toggles = pack_section.get("toggles") or {}
+        if not isinstance(toggles, dict):
+            failures.append(f"packs.{pack_id}: toggles must be an object")
+            continue
+        pack_review = pack_section.get("review_date")
+        for key, entry in sorted(toggles.items()):
+            failures.extend(_check_pack_toggle(pack_id, str(key), entry, ids, pack_review, review_date, root))
+    return failures
+
+
+def _check_pack_toggle(
+    pack_id: str,
+    key: str,
+    entry: Any,
+    ids: dict[str, str],
+    pack_review: Any,
+    ledger_review: Any,
+    root: Path,
+) -> list[str]:
+    qualified = f"packs.{pack_id}.{key}"
+    if not isinstance(entry, dict):
+        return [f"{qualified}: must be an object"]
+    failures: list[str] = []
+    kind = entry.get("kind")
+    status = entry.get("status")
+    if kind not in KINDS:
+        failures.append(f"{qualified}: kind must be one of {sorted(KINDS)}")
+    if status not in STATUSES:
+        failures.append(f"{qualified}: status must be one of {sorted(STATUSES)}")
+    if status == "retired":
+        failures.append(
+            f"{qualified}: 'retired' cannot be proven while nothing reads pack toggles; delete the entry instead"
+        )
+    if not isinstance(entry.get("default"), bool):
+        failures.append(f"{qualified}: default must be true or false")
+    if kind == "ab":
+        if not str(entry.get("id") or "").strip():
+            failures.append(f"{qualified}: an ab entry needs a runbook id")
+        elif entry["id"] in ids:
+            failures.append(f"{qualified}: runbook id {entry['id']} is already claimed by {ids[entry['id']]}")
+        else:
+            ids[str(entry["id"])] = qualified
+    if status == "concluded":
+        if entry.get("verdict") not in VERDICTS:
+            failures.append(f"{qualified}: concluded needs a verdict from {sorted(VERDICTS)}")
+    if status == "open":
+        expiry = _expiry(entry, {"review_date": pack_review or ledger_review})
+        if expiry is None:
+            failures.append(f"{qualified}: open entries need expires, or a pack/ledger review_date")
+        else:
+            try:
+                due = datetime.date.fromisoformat(expiry)
+            except ValueError:
+                failures.append(f"{qualified}: expires must be an ISO date, found {expiry!r}")
+            else:
+                if due < datetime.date.today():
+                    failures.append(f"{qualified}: review date {expiry} has passed -- decide or retire it")
+    doc = str(entry.get("doc") or "").strip()
+    if not doc:
+        failures.append(f"{qualified}: doc must name the runbook or audit that records the hypothesis")
+    elif not (root / doc).is_file():
+        failures.append(f"{qualified}: doc {doc!r} does not exist")
+    return failures
+
+
 def check(root: Path = ROOT) -> list[str]:
     """Return every violation; an empty list means the ledger is honest."""
     if not LEDGER.is_file():
@@ -262,6 +377,12 @@ def check(root: Path = ROOT) -> list[str]:
     for key, sites in sorted(reads.items()):
         if key not in toggles:
             failures.append(f"{key}: read at {', '.join(sites)} but not in the ledger -- record the decision first")
+
+    # Pack-scoped toggles: a second architecture's switches are not
+    # ``registration.*`` keys, so they get their own section instead of being
+    # smuggled into the flat map. Shares ``ids`` so a runbook id cannot be
+    # claimed by two architectures.
+    failures.extend(_check_pack_section(ledger, ids, root))
 
     return failures
 
