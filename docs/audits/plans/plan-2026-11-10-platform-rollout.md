@@ -161,11 +161,11 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 
 ## Phase 5 — 产品面（P5，3–5 个工作日）
 
-| # | 动作 |
-| --- | --- |
-| 5.1 | 桌面按 `capabilities` 渲染：声明 `payment.link` 才显示支付页，声明 `mailbox.otp` 才显示接码 |
-| 5.2 | 命名收敛：`--pack` 与 `--provider` 二选一（建议保留 `--pack`，`provider` 已被邮箱/短信 provider 占用） |
-| 5.3 | `docs/current/cli-reference.md` / `ui-architecture.md` 同步 |
+| # | 动作 | 状态 |
+| --- | --- | --- |
+| 5.1 | 桌面按 `capabilities` 渲染：声明 `payment.link` 才显示支付页，声明 `mailbox.otp` 才显示接码 | 待做（依赖 P3 的多 pack 才有意义） |
+| 5.2 | 命名收敛：`--pack` 与 `--provider` 二选一 | **✅ 已完成（2026-11-11 核实）**：`--provider` 从未存在。`grep '"--provider"'` 唯一命中是 `--provider-proxy`，那是 Stripe 第二阶段代理，与"选哪套架构"不是一个概念，不动它（改它会连带 C# Contracts 与文档）。所以架构选择器的词汇就是 **`--pack` / `GPT_PACK_ID` / `--pack-*`** 三个，无需收敛 |
+| 5.3 | `docs/current/cli-reference.md` / `ui-architecture.md` 同步 | cli-reference 是生成物且已 current（每片都跑 `--check`）；`ui-architecture.md` 等 5.1 落地时同步 |
 
 ---
 
