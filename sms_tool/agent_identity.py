@@ -614,7 +614,10 @@ def _jwt_claims(access_token):
         payload = access_token.split(".")[1]
         payload += "=" * (-len(payload) % 4)
         return json.loads(base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8"))
-    except Exception:
+    except (IndexError, TypeError, ValueError):
+        # IndexError is the real one here: the token has no second segment. The
+        # base64/JSON failures derive from ValueError, and TypeError covers a
+        # non-string token.
         return {}
 
 

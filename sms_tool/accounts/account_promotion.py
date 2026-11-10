@@ -351,7 +351,7 @@ def check_account_promotion(
         status_code = int(getattr(response, "status_code", 0) or 0)
         try:
             retry_after = str((getattr(response, "headers", None) or {}).get("Retry-After") or "").strip()
-        except Exception:
+        except (AttributeError, TypeError, ValueError):  # header bag is not a mapping; no transport here
             retry_after = ""
         try:
             body = response.json()

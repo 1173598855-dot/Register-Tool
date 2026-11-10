@@ -252,6 +252,17 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 **959 → 948**。收窄时按"这个形状实际能抛什么"写元组，并在注释里说明为什么
 传输错误故意不在里面。
 
+### 收窄时还会撞到的两道门禁（2026-11-11 实测）
+
+选目标只是第一步，写下去时还有两条约束，都必须**在提交前**撞过一次才知道：
+
+| 门禁 | 现象 | 正确做法 |
+| --- | --- | --- |
+| `function_length_ratchet` | 在冻结函数里加 3 行解释性注释 → `check_account_promotion: 160 -> 163` 直接红 | 用**行尾注释**代替独立注释行，净行数不变（`except (…):  # 一句理由`） |
+| `test_internal_exception_owner` | `(AttributeError, KeyError, TypeError)` 被判定为"手抄 `INTERNAL_EXCEPTION_TYPES`" | 该常量是 9 个类型的集合；**子集也算抄**。要么 import 常量（root 模块导入 `kernel` 要付一条已冻结的 import 边），要么保留 broad 并加 `# broad-except: compat`。本例选择后者 |
+
+⇒ 所以一片的实际产出常比候选数少：**候选 5 个，能落 4 个**。
+
 ---
 
 ## Phase 7 — 回答最初的问题：账号级风控（1–2 个工作日 + 成本）

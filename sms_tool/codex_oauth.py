@@ -1585,7 +1585,7 @@ def _has_callback_code(url):
 def _cookie_value(session, name):
     try:
         return session.cookies.get(name) or ""
-    except Exception:
+    except Exception:  # broad-except: compat - a jar's get() is vendor-shaped
         return ""
 
 
@@ -1605,7 +1605,9 @@ def _jwt_segment(segment):
     try:
         padded = segment + "=" * (-len(segment) % 4)
         return json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
-    except Exception:
+    except (TypeError, ValueError):
+        # Not base64url JSON; binascii.Error and both decode errors derive from
+        # ValueError.
         return {}
 
 
@@ -1624,7 +1626,7 @@ def _b64url(raw):
 def _as_int(value):
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):
         return 0
 
 
