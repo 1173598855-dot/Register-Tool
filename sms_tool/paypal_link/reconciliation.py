@@ -886,7 +886,7 @@ def _status_code(response: Any) -> int | None:
 def _response_text(response: Any) -> str:
     try:
         value = str(getattr(response, "text", "") or "")
-    except Exception:
+    except (TypeError, ValueError):  # the body is not stringifiable
         return ""
     return value[:_MAX_BODY_LENGTH]
 

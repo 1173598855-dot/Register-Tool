@@ -48,7 +48,7 @@ def browser_available() -> bool:
     try:
         _load_sync_playwright()
         return True
-    except Exception:
+    except ImportError:  # the whole body is one import; "no rail" means exactly that
         return False
 
 

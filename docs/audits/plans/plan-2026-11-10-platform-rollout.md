@@ -261,7 +261,9 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 | `function_length_ratchet` | 在冻结函数里加 3 行解释性注释 → `check_account_promotion: 160 -> 163` 直接红 | 用**行尾注释**代替独立注释行，净行数不变（`except (…):  # 一句理由`） |
 | `test_internal_exception_owner` | `(AttributeError, KeyError, TypeError)` 被判定为"手抄 `INTERNAL_EXCEPTION_TYPES`" | 该常量是 9 个类型的集合；**子集也算抄**。要么 import 常量（root 模块导入 `kernel` 要付一条已冻结的 import 边），要么保留 broad 并加 `# broad-except: compat`。本例选择后者 |
 
-⇒ 所以一片的实际产出常比候选数少：**候选 5 个，能落 4 个**。
+| `test_sunk_copy_parity` | 只改了 `paypal_link/gen_link.py` 的 `_load_json`，`upi_link/config.py` 里逐字节相同的副本没改 → 全量红 | 碰 `upi_link` / `paypal_link` / `gen_pp_link` 里的函数前先跑 `scripts/sunk_copy_parity.py`，两侧同改（结果是白赚一处：预算再降 1） |
+
+⇒ 所以一片的实际产出常比候选数少：**候选 5 个，能落 4 个**；而且**每碰支付沉底副本，收益往往多一处**。
 
 ---
 

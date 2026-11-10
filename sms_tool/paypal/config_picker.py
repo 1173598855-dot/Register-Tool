@@ -103,7 +103,7 @@ def _pick_card_and_address(cfg: dict) -> tuple[dict, dict]:
 def _read_index(path: str) -> int:
     try:
         return int(Path(path).read_text(encoding="utf-8").strip())
-    except Exception:
+    except (OSError, ValueError):  # missing file, or not an integer
         return 0
 
 

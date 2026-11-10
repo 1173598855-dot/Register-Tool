@@ -368,7 +368,7 @@ def _probe_timeout_seconds() -> int:
                 pcfg.get("proxy_probe_timeout_seconds", DEFAULT_PROBE_TIMEOUT_SECONDS) or DEFAULT_PROBE_TIMEOUT_SECONDS
             ),
         )
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # pcfg is not a mapping, or the value is not an int
         return DEFAULT_PROBE_TIMEOUT_SECONDS
 
 

@@ -131,7 +131,7 @@ def _fallback_offset_minutes(tz_iana: str) -> int:
     try:
         offset = datetime.now(ZoneInfo(tz_iana)).utcoffset()
         return int(offset.total_seconds() // 60) if offset else 0
-    except Exception:
+    except (KeyError, OSError, ValueError):  # unknown key (ZoneInfoNotFoundError is a KeyError) or no tzdata
         return 0
 
 
