@@ -208,7 +208,7 @@ class FingerprintPool:
             return profile
         try:
             from .paypal.proxy import infer_proxy_country
-        except Exception:
+        except ImportError:  # the only failure a lazy import has
             return profile
         hint = ""
         try:

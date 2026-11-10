@@ -29,7 +29,7 @@ def _phone_reuse_cfg():
 def _int_value(value, default: int) -> int:
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):  # not an int
         return default
 
 

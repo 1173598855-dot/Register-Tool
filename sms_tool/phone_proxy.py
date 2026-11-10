@@ -321,7 +321,7 @@ def _cache_ttl_seconds() -> int:
     pcfg = phone_proxy_cfg()
     try:
         return max(0, int(pcfg.get("proxy_probe_cache_ttl_seconds", DEFAULT_PROBE_TTL_SECONDS) or 0))
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # pcfg is not a mapping, or the value is not an int
         return DEFAULT_PROBE_TTL_SECONDS
 
 

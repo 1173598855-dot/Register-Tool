@@ -77,7 +77,7 @@ def imap_message_received_ts(message):
     try:
         dt = parsedate_to_datetime(message.get("Date", ""))
         return int(dt.timestamp()) if dt else 0
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # no Date header, or an unparseable one
         return 0
 
 
