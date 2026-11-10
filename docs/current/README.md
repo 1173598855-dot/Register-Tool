@@ -15,6 +15,8 @@
 | 谁 import 谁、哪些模块成环、哪些目录互指 | [dependency-graph.md](dependency-graph.md) | 单模块职责与边界（看 [architecture.md](../architecture.md)）；它只给测量，不给处置 |
 | 邮箱 provider 能力、轮询与终止错误 | [mailbox.md](mailbox.md) | 注册流程 |
 | 一键接码的供应商与租号 | [one-click-sms.md](one-click-sms.md) | 注册流程 |
+| Provider pack 契约、清单、命名空间与多架构维护边界 | [provider-packs.md](provider-packs.md) | 当前 ChatGPT 协议实现细节 |
+| 每套注册架构自己的运维/升级说明 | [../packs/](../packs/README.md) | 平台契约本身 |
 
 **事实的唯一归属**（改一处就别改第二处）：
 
@@ -50,6 +52,7 @@ below so existing links do not break:
 - [`account-health.md`](account-health.md) - 测活、恢复、优惠检查的副作用与代理契约
 - [`mailbox.md`](mailbox.md) - 邮箱 provider 能力、配置注入、轮询和终止错误契约
 - [`one-click-sms.md`](one-click-sms.md) - 一键接码供应商、租号与持久化当前契约
+- [`provider-packs.md`](provider-packs.md) - provider-pack platform: manifest contract, derived namespaces, lifecycle hooks, operator entry points, migration route
 - [`registration-and-proxy-architecture.md`](registration-and-proxy-architecture.md) - runtime control flow and code locations for registration and the proxy lanes
 - [`protocol-payment-enhancement.md`](protocol-payment-enhancement.md) - protocol payment architecture (routing/executor/normalisation); design proposal archived under `docs/audits/plans/`
 - [`paypal-zero-due-link.md`](paypal-zero-due-link.md) - PayPal zero-due link contract

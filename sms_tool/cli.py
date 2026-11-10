@@ -7,10 +7,13 @@ import sys
 import time
 from typing import Any
 
+import certifi
+
 from .config import CFG, ConfigError, default_config_dir, initialize_config_shards, initialize_runtime_config
 from .diagnostics import install_safe_stdio, safe_print
 from .desktop_ipc import emit_result
-from .kernel.paths import output_dir, runtime_file
+from .kernel.paths import install_ascii_ca_bundle, output_dir, runtime_file
+from .packs import PackManifestError, admin as pack_admin, dispatch as pack_dispatch, loader as pack_loader
 from .registration_drivers.base import driver_choices
 from .kernel.sanitizer import sanitize_text
 
@@ -427,6 +430,7 @@ def build_parser():
         email_change,
         omakse,
         one_click,
+        packs,
         payment,
         paypal,
         proxy,
@@ -440,6 +444,7 @@ def build_parser():
     core.register(parser)
     payment.register(parser)
     omakse.register(parser)
+    packs.register(parser)
     session.register(parser)
     paypal.register(parser)
     sub2api.register(parser)
@@ -474,6 +479,27 @@ def _init_config_command() -> int:
     return 0
 
 
+def _install_process_prerequisites() -> None:
+    """Install the two process-wide prerequisites every command depends on.
+
+    * **Safe stdio.** The host parses stdout as an IPC channel, so nothing else
+      may decorate it.
+    * **An ASCII-safe TLS trust store.** ``curl_cffi`` points its bundled libcurl
+      at ``certifi.where()``, and libcurl opens that PEM through the process ANSI
+      code page. A bundle under a non-ASCII path -- a Chinese Windows account
+      name, or a checkout under one -- therefore fails to load and *every* HTTPS
+      request dies with ``curl: (77) error adding trust anchors``. Bridging it to
+      an ASCII copy is a no-op when the ambient paths are already ASCII, which is
+      why CI (an ASCII path) never sees this. See
+      ``docs/TROUBLESHOOTING.md`` §20.
+
+    Both are idempotent, so this stays a single call at the one point in ``main``
+    where the streams are already reconfigured.
+    """
+    install_safe_stdio()
+    install_ascii_ca_bundle(certifi.where())
+
+
 def main():
     # Parsed ahead of the real parser so `--init-config` can run on a machine
     # whose config is empty -- `initialize_runtime_config` would raise first.
@@ -487,7 +513,7 @@ def main():
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:
             reconfigure(encoding="utf-8", errors="replace")
-    install_safe_stdio()
+    _install_process_prerequisites()
     # Mirror stdout/stderr to `runtime/logs/backend_stdout.log`. Most of the
     # protocol lane reports through print(), which only ever reached the host's
     # IPC pipe -- so a run that failed before its first progress record left no
@@ -657,6 +683,92 @@ def main():
     _main_registration_pipeline(args, base_dir)
 
 
+def _pack_management_command(args) -> int | None:
+    """``--pack-list`` / ``--pack-info`` / ``--pack-verify``: the pack entry points.
+
+    Returns the exit code, or ``None`` when no pack flag was given. Each
+    registration architecture is an independently versioned pack, so this is the
+    one place an operator inspects, health-checks or prepares an upgrade for one
+    without running a registration or touching the others.
+    """
+    list_requested = bool(getattr(args, "pack_list", False))
+    info_id = getattr(args, "pack_info", None)
+    verify_target = getattr(args, "pack_verify", None)
+    if not (list_requested or info_id or verify_target):
+        return None
+    try:
+        registry = pack_loader.load_registry()
+    except PackManifestError as exc:
+        safe_print(f"provider pack load failed: {exc}", file=sys.stderr)
+        return 2
+
+    payload: dict
+    ok = True
+    if info_id:
+        try:
+            payload = pack_admin.pack_detail(registry, info_id)
+        except KeyError:
+            safe_print(f"unknown provider pack: {info_id}", file=sys.stderr)
+            return 2
+    elif verify_target is not None:
+        ids = None if verify_target == "*" else (verify_target,)
+        try:
+            payload = pack_admin.verify_registry(registry, ids)
+        except KeyError as exc:
+            safe_print(f"unknown provider pack: {exc.args[0] if exc.args else exc}", file=sys.stderr)
+            return 2
+        ok = bool(payload["ok"])
+    else:
+        payload = {
+            "ok": True,
+            "packs": pack_admin.pack_rows(registry),
+            "capabilities": pack_admin.capability_matrix(registry),
+        }
+
+    if getattr(args, "desktop_ipc", False):
+        emit_result(dict(payload), enabled=True)
+    elif getattr(args, "json_output", False):
+        safe_print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        _print_pack_report(payload)
+    return 0 if ok else 2
+
+
+def _print_pack_report(payload: dict) -> None:
+    """Human-readable rendering for the three pack payload shapes."""
+    if "reports" in payload:
+        for report in payload["reports"]:
+            state = "ok" if report["ok"] else "FAILED"
+            safe_print(f"{report['id']} {report['version']} (api {report['api_version']}): {state}")
+            for failure in report["failures"]:
+                safe_print(f"  - {failure}")
+        return
+    if "entrypoint_references" in payload:
+        namespaces = payload["namespaces"]
+        safe_print(f"{payload['id']}  {payload['display_name']} {payload['version']}  status={payload['status']}")
+        safe_print(f"  api_version : {payload['api_version']}")
+        safe_print(f"  config      : {namespaces['config']}")
+        safe_print(f"  storage     : {namespaces['storage']}")
+        safe_print(f"  telemetry   : {namespaces['telemetry']}")
+        safe_print(f"  capabilities: {', '.join(payload['capabilities']) or '-'}")
+        for kind in ("entrypoint", "hook"):
+            for name, reference in payload[f"{kind}_references"].items():
+                safe_print(f"  {kind:<10}: {name} -> {reference}")
+        if payload["missing_hooks"]:
+            safe_print(f"  reserved   : {', '.join(payload['missing_hooks'])} (declared by no pack yet)")
+        return
+    rows = payload.get("packs") or []
+    safe_print(f"{'id':<24} {'version':<9} {'status':<12} {'caps':>4} {'entries':>7} {'hooks':>5}")
+    for row in rows:
+        safe_print(
+            f"{row['id']:<24} {row['version']:<9} {row['status']:<12} "
+            f"{len(row['capabilities']):>4} {len(row['entrypoints']):>7} {len(row['hooks']):>5}"
+        )
+    safe_print("\ncapability -> packs")
+    for capability, packs in (payload.get("capabilities") or {}).items():
+        safe_print(f"  {capability:<30} {', '.join(packs)}")
+
+
 def _main_early_commands(args) -> bool:
     """Early-exit commands that run before the registration pipeline.
 
@@ -674,6 +786,9 @@ def _main_early_commands(args) -> bool:
 
         run_proxy_command(args)
         raise SystemExit(0)
+    pack_exit = _pack_management_command(args)
+    if pack_exit is not None:
+        raise SystemExit(pack_exit)
     if getattr(args, "doctor", False):
         from .config import default_config_dir
         from .doctor import print_doctor_report, run_doctor
@@ -1093,8 +1208,23 @@ def _refresh_cpa_quota(args):
     return account_commands.refresh_cpa_quota(args, _account_command_context())
 
 
+def _account_health_probe():
+    """Resolve the ``account.health`` probe from the pack that claims it.
+
+    This is the first capability actually *dispatched* rather than imported: the
+    manifest decides which function runs, and a broken or disabled pack fails
+    here with a named reason instead of silently importing the old symbol.
+    """
+    return pack_dispatch.resolve_capability_entrypoint("account.health", "account_liveness")
+
+
 def _quota_usage(args):
-    return account_commands.quota_usage(args)
+    try:
+        probe_fn = _account_health_probe()
+    except pack_dispatch.CapabilityDispatchError as exc:
+        safe_print(f"--quota-usage: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None
+    return account_commands.quota_usage(args, probe_fn=probe_fn)
 
 
 def _payment_link_command_context():

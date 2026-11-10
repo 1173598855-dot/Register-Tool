@@ -22,6 +22,9 @@ export remain separate workflows.
 | --- | --- | --- |
 | `SmsWorkbench/` | UI, command planning, task lifecycle, presentation | Provider protocol and registration state |
 | `sms_tool/commands/` | CLI argument adaptation | Provider implementation |
+| `packs/` | Provider manifest contract, capability/risk vocabulary, registry, discovery, admin surface. Standard library only at module scope | Any provider implementation; retry or bypass policy |
+| `platforms/<short>/` | One registration architecture's protocol implementation, reached only through its pack manifest reference | Another architecture's code; the manifest itself |
+| `cli.py` (`--pack-list` / `--pack-info` / `--pack-verify`) | The pack management entry points | Pack internals; the management surface stays read-only |
 | `registration/orchestrator.py` | Protocol entry points: `run_email` / `run_batch` dispatch, runtime-config and driver selection, and the per-invocation `RegistrationOperations` binding | Stage ordering and stage bodies (owned by `handlers.py` and the sibling stage modules) |
 | `registration/handlers.py` | Protocol workflow and stage ordering | Payment or recovery orchestration |
 | `registration/persistence.py`, `registration/stage_runner.py`, `registration/protocol_helpers.py`, `registration/otp_stages.py`, `registration/account_stages.py`, `registration/edge_challenge.py`, `registration/resume.py`, `registration/sentinel_stages.py` | Persistence seam, stage executor + abort signal, pure transport/format helpers, the email-OTP stages, the account-creation / session / AT-probe stages, the in-flow edge-challenge hook (same-pool exit move + audit counters), checkpoint persistence + the post-create resume stage, and Sentinel issuance (switch / password-page bundle / per-flow); re-exported by `registration/handlers.py` | Stage ordering |
@@ -214,7 +217,7 @@ above.
 | Delayed cross-directory edges | 307 |
 | Delayed imports in the package | 473 (baseline 473) |
 | Functions at or above 150 lines | 64 (frozen, `scripts/function_length_ratchet.py`) |
-| Claimed tracked `sms_tool` modules | 327 of 327 (0 unclaimed, 41 directory-map groups) |
+| Claimed tracked `sms_tool` modules | 336 of 336 (0 unclaimed, 43 directory-map groups) |
 <!-- ratchet-numbers:end architecture -->
 
 `tests/config/test_pilens_scope_config.py` pins the scope and the formatting

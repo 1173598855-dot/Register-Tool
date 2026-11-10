@@ -26,7 +26,9 @@
     "proxy": 5,
     "mailbox": 3,
     "payment": 5,
-    "registration": 3
+    "registration": 3,
+    "packs": 4,
+    "platforms": 3
   },
   "module_overrides": {
     "accounts/account_models": 5,

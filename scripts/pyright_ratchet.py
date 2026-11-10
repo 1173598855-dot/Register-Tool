@@ -97,6 +97,7 @@ def run_pyright(targets: tuple[str, ...] = TARGETS) -> dict:
         cwd=str(ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     payload = (proc.stdout or "").strip()
     if not payload:

@@ -105,6 +105,9 @@ are omitted.
 | `--one-click-scan` | — | Batch OAuth scan accounts for account_deactivated and add-phone/secondary phone verification |
 | `--one-click-sms` | — | Run Codex OAuth login for selected account(s), complete phone SMS verification, and store RT |
 | `--open-paypal-link` | — | Open saved PayPal payment link for --email |
+| `--pack-info` | `PACK_ID` | Show one provider pack's manifest, namespaces and lifecycle hooks, then exit |
+| `--pack-list` | — | List installed provider packs (registration architectures) and their capabilities, then exit |
+| `--pack-verify` | `PACK_ID` | Resolve every declared pack entrypoint and hook (all packs when no id is given), then exit |
 | `--paid-timeout` | value | Seconds to wait for UPI payment when --wait-paid is set (default 900) |
 | `--password` | value | Use a specific password |
 | `--payment-batch-id` | value | Batch ID; reused only together with --payment-resume-checkpoint |

@@ -35,6 +35,9 @@ payment requests are never part of the default suite.
 - `test_result_schema_check.py` guards `result_schema.json`: a builder's result keys and every declared C# reader's reads are checked against it in both directions.
 - `test_experiment_ratchet.py` guards `scripts/experiment_ledger.json`: every `registration.*` A/B toggle has a kind, default, status and runbook id, and the ledger still matches the code and `config.example.json`.
 - `test_docs_consistency.py` guards current release pointers and documented provider paths.
+- `packs/test_pack_platform.py` guards the provider-pack platform: manifest validation, `provider-pack.v1` compatibility, derived namespaces, lazy entrypoint/hook resolution, discovery through `GPT_PACK_PATH`, and the read-only admin surface.
+- `packs/test_chatgpt_pack.py` is the ChatGPT architecture's own maintenance entry: it fails when the pack manifest stops describing code that exists.
+- `governance/test_pack_boundary_ratchet.py` guards `scripts/pack_boundary_ratchet.py`, proving each rule fails on a mutated tree rather than only passing on the real one.
 - `test_email_otp_filtering.py` covers message recipient, subject, and body OTP filtering.
 - `test_storage_dedup.py` covers SQLite account upsert and email normalization behavior.
 - `test_gen_pp_link.py` covers hosted Stripe/PayPal link generation error handling.

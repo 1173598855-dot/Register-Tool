@@ -1,0 +1,50 @@
+{
+  "schema": "provider-pack.v2",
+  "id": "openai.chatgpt",
+  "display_name": "ChatGPT",
+  "version": "1.1.0",
+  "api_version": "1",
+  "status": "active",
+  "capabilities": [
+    "account.health",
+    "account.registration.email",
+    "mailbox.otp",
+    "payment.batch",
+    "payment.link",
+    "session.access_token"
+  ],
+  "endpoints": {
+    "api": "https://api.openai.com",
+    "auth": "https://auth.openai.com",
+    "chat": "https://chatgpt.com"
+  },
+  "entrypoints": {
+    "account_liveness": "sms_tool.accounts.account_liveness:probe_account_liveness",
+    "register_batch": "sms_tool.registration.orchestrator:run_batch",
+    "register_email": "sms_tool.registration.orchestrator:run_email",
+    "registration_preflight": "sms_tool.registration.preflight:registration_network_preflight"
+  },
+  "hooks": {
+    "verify": "sms_tool.registration.preflight:registration_network_preflight"
+  },
+  "risk_signals": [
+    {
+      "code": "account_deactivated",
+      "category": "account",
+      "retryable": false,
+      "terminal": true
+    },
+    {
+      "code": "cloudflare_challenge",
+      "category": "network",
+      "retryable": true,
+      "terminal": false
+    },
+    {
+      "code": "registration_disallowed",
+      "category": "account",
+      "retryable": false,
+      "terminal": true
+    }
+  ]
+}

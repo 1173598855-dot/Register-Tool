@@ -472,8 +472,14 @@ def _relogin_panel_note(relogin: dict) -> str:
     return " → 重登未完成"
 
 
-def quota_usage(args: Any) -> None:
-    """Fetch wham/usage 5h/7d quota for a single account and return structured JSON."""
+def quota_usage(args: Any, *, probe_fn: Any = None) -> None:
+    """Fetch wham/usage 5h/7d quota for a single account and return structured JSON.
+
+    ``probe_fn`` is the injected ``account.health`` capability. The CLI resolves
+    it from the provider pack that claims that capability, so which function
+    runs is a manifest decision rather than a hard-coded import. It defaults to
+    the direct import so every existing caller and test is unchanged.
+    """
     from ..accounts.account_liveness import probe_account_liveness
     from ..storage import get_account_payload
 
@@ -494,7 +500,7 @@ def quota_usage(args: Any) -> None:
 
     proxy = getattr(args, "proxy", None) or None
     timeout = max(5, int(getattr(args, "refresh_timeout", None) or 30))
-    probe = probe_account_liveness(account, proxy=proxy, timeout=timeout)
+    probe = (probe_fn or probe_account_liveness)(account, proxy=proxy, timeout=timeout)
     result = {
         "ok": probe.get("ok", False),
         "email": email,

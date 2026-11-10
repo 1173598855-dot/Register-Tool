@@ -109,6 +109,10 @@
     ],
     [
       "sms_tool.cli",
+      "sms_tool.cli_parsers.packs"
+    ],
+    [
+      "sms_tool.cli",
       "sms_tool.cli_parsers.payment"
     ],
     [

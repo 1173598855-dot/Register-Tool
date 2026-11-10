@@ -255,6 +255,12 @@
       "sms_tool/diagnostics.py",
       "sms_tool/logging_setup.py",
       "sms_tool/token_telemetry.py"
+    ],
+    "Provider pack contracts": [
+      "sms_tool/packs/*.py"
+    ],
+    "Registration platform implementations": [
+      "sms_tool/platforms/*.py"
     ]
   }
 }
