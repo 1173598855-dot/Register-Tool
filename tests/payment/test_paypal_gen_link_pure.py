@@ -24,7 +24,6 @@ import os
 import tempfile
 import unittest
 from typing import Any
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from sms_tool.paypal_link import gen_link

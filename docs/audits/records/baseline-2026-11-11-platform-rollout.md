@@ -41,7 +41,7 @@
 
 | 债 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
-| unused import | 256（基线 257） | **122**（45 文件） | `python scripts/unused_import_ratchet.py` |
+| unused import | 256（基线 257） | **90**（18 文件） | `python scripts/unused_import_ratchet.py` |
 | broad except | 959 / 158 silent（预算 960/158） | **891 / 158**（预算 891/158） | `python scripts/broad_except_ratchet.py` |
 
 两条轴的推进方式与**边界**（都已写进方案）：
@@ -49,12 +49,14 @@
 - **broad-except**：跨泳道的结构性回退（解析、类型强转、属性探测）已做完；剩下的 39 个候选
   逐个人工核对后**多数必须保留**（包的是调用 / 返回探针失败字典 / 自然元组是
   `INTERNAL_EXCEPTION_TYPES` 的子集）。再往下走是泳道级决策，不是 per-file 切片。
-- **unused-import**：剩下的 122 条集中在六类**接缝**上，按类列出。facade 一类已用**声明**
-  而不是删除处理了两处：`upi_link/pipeline.py`（70 个名，−71）与
-  `paypal_link/gen_link.py`（22 个名 + 删掉 3 条真死导入，−25），因为那些名字是
-  `stages.py` / `paypal_link/__init__.py` 从该模块命名空间取走的，也是
-  `patch("sms_tool.upi_link.pipeline.<name>")` 这类目标。同一条路对其余 facade 一样可用，
-  但**必须逐个确认没有 `from x import *` 消费者**，否则 `__all__` 会改变 star-import 的可见面：
+- **unused-import**：剩下的 90 条集中在六类**接缝**上，按类列出。`tests/` 那 32 条已全部
+  清掉（不含任何接缝：逐个确认既不是 patch 目标也不是再导出，`_browser_heartbeat` 那类
+  只在**字符串路径**里被 patch，不需要本地导入）。facade 一类已用**声明**而不是删除处理了
+  两处：`upi_link/pipeline.py`（70 个名，−71）与 `paypal_link/gen_link.py`（22 个名 +
+  删掉 3 条真死导入，−25），因为那些名字是 `stages.py` / `paypal_link/__init__.py` 从该
+  模块命名空间取走的，也是 `patch("sms_tool.upi_link.pipeline.<name>")` 这类目标。同一条路
+  对其余 facade 一样可用，但**必须逐个确认没有 `from x import *` 消费者**，否则 `__all__`
+  会改变 star-import 的可见面：
 
 | 类 | 例子 | 判据（怎么识别） |
 | --- | --- | --- |

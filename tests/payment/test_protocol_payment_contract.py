@@ -15,7 +15,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "services" / "protocol-payment" / "common"))
 
 from protocol_core import (  # noqa: E402
-    ProtocolResult,
     ProtocolResultReporter,
     sanitize_payload,
     sanitize_text,

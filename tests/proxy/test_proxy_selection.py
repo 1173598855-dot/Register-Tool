@@ -20,7 +20,7 @@ import re
 import sys
 import unittest
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import unquote
 
 MODULE_PATH = Path(__file__).resolve().parents[2] / "services" / "protocol-payment" / "common" / "proxy_selection.py"
 SPEC = importlib.util.spec_from_file_location("proxy_selection", MODULE_PATH)

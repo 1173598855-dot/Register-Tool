@@ -1,6 +1,5 @@
 import unittest
 from collections.abc import Mapping
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from sms_tool.checkout_contract import CheckoutRequestContract

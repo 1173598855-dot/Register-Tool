@@ -5,7 +5,6 @@ from __future__ import annotations
 import unittest
 
 from sms_tool.paypal.authorization import (
-    PayPalAuthorizationContext,
     classify_authorization_outcome,
     parse_authorization_context,
     to_payment_result,
