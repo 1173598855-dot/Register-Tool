@@ -106,4 +106,9 @@ def test_detail_mode_lists_per_file_counts(capsys, monkeypatch):
     monkeypatch.setattr(ratchet, "BASELINE", ratchet.BASELINE)
     assert ratchet.main(["--detail"]) == 0
     out = capsys.readouterr().out
-    assert "sms_tool/paypal_link/gen_link.py" in out, "detail output should name the worst file"
+    # Ask the ratchet which file it considers worst instead of hardcoding one: the
+    # previous constant here was ``paypal_link/gen_link.py``, which stopped having
+    # any findings once its re-export surface was declared in ``__all__``. A test
+    # that pins "the worst file" by name has to re-pin whenever the debt moves.
+    worst = max(ratchet.collect().items(), key=lambda item: (item[1], item[0]))[0]
+    assert worst in out, f"detail output should name the worst file ({worst})"

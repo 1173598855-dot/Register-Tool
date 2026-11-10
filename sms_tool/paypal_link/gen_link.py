@@ -29,8 +29,6 @@ import os
 
 from collections.abc import Mapping
 
-from pathlib import Path
-
 from typing import Any
 
 from ..checkout_contract import PLUS_TRIAL_CAMPAIGN_ID, CheckoutRequestContract, CheckoutSessionContract
@@ -56,8 +54,6 @@ from ..pp_link_helpers import (
     billing_for_country,
     stripe_amount_details,
     BILLING_DATA,
-    PM_REDIRECT_RE,
-    PAYPAL_BA_RE,
 )
 
 
@@ -1368,6 +1364,42 @@ DEFAULT_TARGET_COUNTRIES = ("AU", "TH", "US", "GB", "DE", "JP", "SG", "NZ", "CA"
 
 
 DEFAULT_CHECKOUT_COUNTRIES = ("JP", "TH")
+
+
+# ── Public surface ────────────────────────────────────────────────────────────
+# These names are imported into this module on purpose and are read back out of it
+# by `paypal_link/__init__.py`, which re-exports the PayPal shell's surface from
+# here (see its `from .gen_link import (...)` block). Declaring them is what makes
+# that intent checkable, instead of leaving ruff to report 22 "unused" imports that
+# are in fact this module's reason to exist.
+#
+# Note the two regexes that are deliberately absent: `PM_REDIRECT_RE` and
+# `PAYPAL_BA_RE` were imported here for the pre-split monolith, are consumed only
+# from `pp_link_helpers` now, and were removed rather than declared.
+__all__ = [
+    "BILLING_DATA",
+    "PPLinkExtractor",
+    "_PAYPAL_PROXY_STATE_CACHE",
+    "_SIDE_EFFECT_STAGES",
+    "_checkout_post",
+    "_compact_diagnostic",
+    "_new_session",
+    "_proxies_from_config",
+    "_proxy_health_cfg",
+    "_proxy_pool_values",
+    "_rank_stage_proxy",
+    "billing_for_country",
+    "extract_ba_token",
+    "extract_redirect_url",
+    "find_submission_attempt",
+    "find_url_in_value",
+    "is_paypal_ba_approve_url",
+    "is_retryable_network_error",
+    "normalize_proxy_template",
+    "resolve_external_redirect",
+    "rotate_proxy_session_id",
+    "stripe_confirm_error_diagnostics",
+]
 
 
 if __name__ == "__main__":

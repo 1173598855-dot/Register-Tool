@@ -16,7 +16,6 @@
     "sms_tool/paypal/orchestrator.py": 2,
     "sms_tool/paypal/protocol.py": 1,
     "sms_tool/paypal/reverse.py": 1,
-    "sms_tool/paypal_link/gen_link.py": 25,
     "sms_tool/pp_link_helpers.py": 9,
     "sms_tool/providers/mailbox_cfworker.py": 1,
     "sms_tool/providers/smailr_client.py": 1,
@@ -56,5 +55,5 @@
     "tests/workbench/test_cli_registration_driver.py": 1,
     "tests/workbench/test_operator_output.py": 1
   },
-  "total": 156
+  "total": 131
 }
