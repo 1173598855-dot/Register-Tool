@@ -194,7 +194,6 @@ def _load_heavy_deps() -> None:
         from .registration.orchestrator import (
             _build_session_file as _bsf,
             _mailbox_snapshot as _ms,
-            run_email as _re2,
         )
 
         if _build_session_file is None:
@@ -202,7 +201,12 @@ def _load_heavy_deps() -> None:
         if _mailbox_snapshot is None:
             _mailbox_snapshot = _ms
         if run_email is None:
-            run_email = _re2
+            # The registration entry point is a manifest decision now, not an
+            # import: the pack that claims account.registration.email names the
+            # callable. It is the same object while only one pack exists, but the
+            # manifest is what decides, and a broken pack fails here instead of
+            # silently running a stale symbol.
+            run_email = _capability_entrypoint("account.registration.email", "register_email")
 
 
 def _registration_proxy_lane(registration_driver: object = None) -> str:
@@ -1209,28 +1213,35 @@ def _refresh_cpa_quota(args):
     return account_commands.refresh_cpa_quota(args, _account_command_context(), probe_fn=probe_fn)
 
 
-def _account_health_probe(pack_id=None):
-    """Resolve the ``account.health`` probe from the pack that claims it.
+def _capability_entrypoint(capability: str, entrypoint: str, pack_id: str | None = None):
+    """Resolve a declared capability entrypoint through the provider pack.
 
-    This is the capability actually *dispatched* rather than imported: the
-    manifest decides which function runs, and a broken, disabled or ambiguous set
-    of packs fails here with a named reason instead of silently importing the old
-    symbol.
+    One place for every dispatch point in this module, so the failure story is
+    identical everywhere: a broken, disabled or ambiguous pack raises with its
+    reason instead of silently importing the old symbol. The startup resolver
+    lets that error surface (a misconfigured install must not half-work); command
+    paths wrap it in :func:`_capability_entrypoint_or_exit` so the desktop host
+    receives an exit code rather than a stack.
     """
-    return pack_dispatch.resolve_capability_entrypoint("account.health", "account_liveness", pack_id=pack_id)
+    return pack_dispatch.resolve_capability_entrypoint(capability, entrypoint, pack_id=pack_id)
 
 
-def _account_health_probe_or_exit(args, command: str):
-    """Best-effort wrapper: a dispatch failure is a preflight failure, not a traceback.
-
-    The desktop host renders exit codes rather than stacks, so everything that
-    resolves a capability reports the same way `--doctor` does.
-    """
+def _capability_entrypoint_or_exit(args, capability: str, entrypoint: str, command: str):
     try:
-        return _account_health_probe(getattr(args, "pack", None))
+        return _capability_entrypoint(capability, entrypoint, getattr(args, "pack", None))
     except (pack_dispatch.CapabilityDispatchError, PackManifestError) as exc:
         safe_print(f"{command}: {exc}", file=sys.stderr)
         raise SystemExit(2) from None
+
+
+def _account_health_probe(pack_id=None):
+    """Resolve the ``account.health`` probe from the pack that claims it."""
+    return _capability_entrypoint("account.health", "account_liveness", pack_id)
+
+
+def _account_health_probe_or_exit(args, command: str):
+    """Best-effort wrapper: a dispatch failure is a preflight failure, not a traceback."""
+    return _capability_entrypoint_or_exit(args, "account.health", "account_liveness", command)
 
 
 def _quota_usage(args):
@@ -1247,7 +1258,15 @@ def _payment_link_command_context():
 
 
 def _generate_ba_link(args):
-    return payment_link_commands.generate_ba_link(args, _payment_link_command_context())
+    # Injected only when an architecture is explicitly selected. The default path
+    # keeps the historical seam (`commands.payment_links.generate_pp_link`, which
+    # tests patch and Rule 6 relies on): the payment lane already owns its own
+    # method registry, so forcing pack dispatch on it by default would be a second
+    # registry rather than a routing decision.
+    link_factory = None
+    if getattr(args, "pack", None):
+        link_factory = _capability_entrypoint_or_exit(args, "payment.link", "paypal_link", "--generate-ba-link")
+    return payment_link_commands.generate_ba_link(args, _payment_link_command_context(), link_factory=link_factory)
 
 
 def _generate_upi_qr(args):

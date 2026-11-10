@@ -20,6 +20,7 @@
   },
   "entrypoints": {
     "account_liveness": "sms_tool.accounts.account_liveness:probe_account_liveness",
+    "paypal_link": "sms_tool.gen_pp_link:generate_pp_link",
     "register_batch": "sms_tool.registration.orchestrator:run_batch",
     "register_email": "sms_tool.registration.orchestrator:run_email",
     "registration_preflight": "sms_tool.registration.preflight:registration_network_preflight"

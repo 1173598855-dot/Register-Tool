@@ -330,3 +330,77 @@ def test_refresh_local_quota_statuses_threads_the_probe(monkeypatch: pytest.Monk
 
     # The injected callable is what reaches the retry helper, not the import.
     assert seen and seen[0] is marker
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: the registration entry and the payment-link factory
+# ---------------------------------------------------------------------------
+
+
+def test_the_registration_entrypoint_is_the_object_the_cli_used_to_import() -> None:
+    """Anti-drift: the manifest must name the same callable the CLI imported."""
+    from sms_tool.registration import orchestrator
+
+    resolved = dispatch.resolve_capability_entrypoint("account.registration.email", "register_email")
+
+    assert resolved is orchestrator.run_email
+
+
+def test_the_payment_link_entrypoint_resolves_to_the_shipped_generator() -> None:
+    import sms_tool.gen_pp_link as gen_pp_link
+
+    resolved = dispatch.resolve_capability_entrypoint("payment.link", "paypal_link")
+
+    assert resolved is gen_pp_link.generate_pp_link
+
+
+def test_the_cli_injects_the_payment_link_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Wiring proof: without this the payment-link seam would have no caller."""
+    from sms_tool.commands import payment_links
+
+    marker = object()
+    seen: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        payment_links,
+        "generate_ba_link",
+        lambda args, ctx, *, link_factory=None: seen.update(factory=link_factory),
+    )
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", lambda capability, entrypoint, **kw: marker)
+
+    cli._generate_ba_link(types.SimpleNamespace(pack="acme.portal"))
+
+    assert seen["factory"] is marker
+
+
+def test_the_cli_reports_a_missing_payment_link_pack_instead_of_crashing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable(capability: str, entrypoint: str, **kwargs: Any) -> Any:
+        raise dispatch.CapabilityDispatchError("no enabled provider pack claims the capability")
+
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", unavailable)
+
+    with pytest.raises(SystemExit) as excinfo:
+        cli._generate_ba_link(types.SimpleNamespace(pack="acme.portal"))
+
+    assert excinfo.value.code == 2
+
+
+def test_without_a_selected_pack_the_payment_link_seam_is_untouched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No --pack means no injection: the payment lane keeps its own registry."""
+    from sms_tool.commands import payment_links
+
+    seen: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        payment_links,
+        "generate_ba_link",
+        lambda args, ctx, *, link_factory=None: seen.update(factory=link_factory),
+    )
+
+    cli._generate_ba_link(types.SimpleNamespace(pack=None))
+
+    assert seen["factory"] is None

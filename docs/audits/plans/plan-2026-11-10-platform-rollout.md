@@ -90,13 +90,21 @@ registry 时永不缓存」；性能上批处理里 `load_registry` 调用次数
 的根源。入口点也已有 4 个（`register_email` / `register_batch` / `account_liveness` /
 `registration_preflight`），但只有 1 个被 dispatch 使用。
 
-| # | 能力 | dispatch 点 | 注意 |
+| # | 能力 | dispatch 点 | 状态 |
 | --- | --- | --- | --- |
-| 2.1 | `session.access_token` | `probe_access_token` 阶段 + `--refresh-*` 的探活 | 注册结果判定就是它，改动必须带对等测试 |
-| 2.2 | `mailbox.otp` | `mailbox/service.py` 的取码入口 | 同一批要覆盖 8 类邮箱源 |
-| 2.3 | `payment.link` | `commands/payment_links.py` → `pay_link` registry | 与既有 `pay_link` 注册表并存，别造第二套注册表 |
-| 2.4 | `account.registration.email` | `cli._main_registration_pipeline` 的 `run_email`/`run_batch` | 最大的一条；先做 `run_email` 单账号，批量留到 2.5 |
-| 2.5 | `payment.batch` + 批量注册 | `batch_runner` 入口 | 需要先有 2.4 |
+| 2.1 | `session.access_token` | AT 探活阶段 | **阻塞**：消费方是 `registration/account_stages.py`，而 `sms_tool/registration -> sms_tool` 的 import 预算已满；**Phase 4 之后自动解锁**（实现搬进 `platforms/chatgpt/` 后就与 `packs` 同目录节点，导入免费） |
+| 2.2 | `mailbox.otp` | `registration/otp_stages.py` 取码阶段 | **同上阻塞、同上解锁路径** |
+| 2.3 | `payment.link` | `--generate-ba-link` → `commands/payment_links.py` | **已完成**：只在显式给了 `--pack` 时注入 `link_factory`；默认保留支付泳道自己的方法注册表（不然就是第二套注册表） |
+| 2.4 | `account.registration.email` | `cli._load_heavy_deps` 解析 `run_email` | **已完成**：manifest 决定注册入口，不再是 import；单 pack 时是同对象 |
+| 2.5 | `payment.batch` + 批量注册 | `cli._main_registration_pipeline` | 待做（依赖 2.4 的批量路径） |
+| 2.6 | 台账 code↔ledger 双向 | 新增 pack 作用域 flag reader | 待做 |
+
+**已完成的 §2.3/2.4 都没有新增 import 边**：`import-layer` 仍是 473 边 / 78 对，
+`delayed` 仍是 473/362 —— 这是"命令层解析 + 关键字注入"这条约束的直接证据。
+
+**2.1/2.2 的决策已明确，不必现在拍板**：它们不是"做不做"的问题，而是"什么时候"。
+Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同属 `sms_tool` 目录节点，
+导入不计边，两处 dispatch 点可以零成本接上。**所以 P4 不是可选项，它是 2.1/2.2 的前置。**
 
 **每个能力的固定三件套测试**（照 `account.health` 的样子）：
 1. 对象同一性：解析出的 callable `is` 工作流原本 import 的那个

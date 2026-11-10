@@ -50,8 +50,13 @@ def _reverse_pay_adapter() -> Callable[..., dict[str, Any]]:
     return try_reverse_pay
 
 
-def generate_ba_link(args: Any, ctx: PaymentLinkCommandContext) -> None:
-    """Generate PayPal BA link from Access Token."""
+def generate_ba_link(args: Any, ctx: PaymentLinkCommandContext, *, link_factory: Any = None) -> None:
+    """Generate PayPal BA link from Access Token.
+
+    ``link_factory`` is the injected ``payment.link`` capability, resolved by the
+    CLI from the provider pack that claims it. It defaults to the direct import so
+    every existing caller and test is unchanged.
+    """
 
     at = (getattr(args, "at", None) or "").strip()
     if not at:
@@ -107,7 +112,7 @@ def generate_ba_link(args: Any, ctx: PaymentLinkCommandContext) -> None:
     require_zero = not getattr(args, "no_require_zero", False)
     require_ba_token = bool(getattr(args, "require_ba_token", False))
 
-    result = generate_pp_link(
+    result = (link_factory or generate_pp_link)(
         access_token=at,
         proxy=proxy,
         checkout_proxy=checkout_proxy,
