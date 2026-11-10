@@ -36,7 +36,10 @@ def _jwt_claims(token):
         payload = parts[1] + "=" * (-len(parts[1]) % 4)
         data = json.loads(base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8"))
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except (TypeError, ValueError):
+        # A token that is not base64url JSON. binascii.Error, UnicodeDecodeError
+        # and JSONDecodeError all derive from ValueError; TypeError covers a
+        # non-string token. Anything else is a defect, not a malformed claim.
         return {}
 
 

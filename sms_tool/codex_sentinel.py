@@ -12,7 +12,10 @@ def load_cached_sentinel():
             return {}
         data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except (OSError, ValueError):
+        # Unreadable cache file (OSError) or a body that is not JSON (ValueError
+        # covers JSONDecodeError and UnicodeDecodeError). A corrupt cache is
+        # legitimately "no cache"; any other exception must surface.
         return {}
 
 
