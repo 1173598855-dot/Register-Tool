@@ -148,12 +148,20 @@ class WorkspaceScanTests(unittest.TestCase):
         self.assertEqual(result["account_type_after"], "free")
 
     def test_target_mismatch_without_auto_switch_marks_not_target(self):
+        # Both seams are injected: the workspace selector normally POSTs to the
+        # live workspace endpoint, which made this a network-dependent unit test
+        # (and the only failure in a parallel full run, on a machine whose CA
+        # bundle sits under a non-ASCII path). The stub still lets the fetcher
+        # report a different account id, so the mismatch comparison is what the
+        # assertion is about.
         result = workspace_scan.inspect_workspace(
             {"email": "a@example.com", "cookie_header": "s=1"},
             target_workspace_id="ws-target",
             fetch_auth_session_func=lambda account, **kwargs: {"account": {"id": "personal"}},
+            select_workspace_func=lambda cookie, workspace_id, **kwargs: {"ok": True},
         )
         self.assertEqual(result["status"], "workspace_switch_failed")
+        self.assertEqual(result["error"], "no_fallback_workspace_selected")
 
 
 if __name__ == "__main__":

@@ -123,7 +123,11 @@ def _fill_openai_checkout_billing(page, address: dict, first_name: str, last_nam
     ]
     for selectors, value in fields:
         if value:
-            _fill_visible_input(page, selectors, value, timeout=1500) or _fill_with_fallback(
+            # Every helper returns True when it actually typed into the field, so
+            # the chain stops at the first success. The combined result is not
+            # needed, but the short-circuit is (it is what stops a later, wider
+            # selector from overwriting a field an earlier one already filled).
+            _ = _fill_visible_input(page, selectors, value, timeout=1500) or _fill_with_fallback(
                 page, selectors, value, timeout=1500
             )
     if country:
@@ -370,11 +374,12 @@ def _fill_card(page, card: dict):
             "#expiry",
         ]
         exp_str = f"{exp_month}/{exp_year[-2:]}"
-        _fill_dom_ids(page, ["cardExpiry"], exp_str) or _fill_visible_input(
-            page, exp_selectors, exp_str, timeout=5000
-        ) or _fill_by_label_fallback(
-            page, ["Expiration date", "Expiry date", "MM/YY"], exp_str, timeout=5000
-        ) or _fill_with_fallback(page, exp_selectors, exp_str, timeout=5000)
+        _ = (
+            _fill_dom_ids(page, ["cardExpiry"], exp_str)
+            or _fill_visible_input(page, exp_selectors, exp_str, timeout=5000)
+            or _fill_by_label_fallback(page, ["Expiration date", "Expiry date", "MM/YY"], exp_str, timeout=5000)
+            or _fill_with_fallback(page, exp_selectors, exp_str, timeout=5000)
+        )
     else:
         with contextlib.suppress(Exception):
             page.locator(month_selectors[0]).first.select_option(value=exp_month)
@@ -401,10 +406,11 @@ def _fill_card(page, card: dict):
         "#cvc",
         'input[data-testid="cvv-input"]',
     ]
-    _fill_dom_ids(page, ["cardCvv", "cvv", "cvc"], cvv) or _fill_visible_input(
-        page, cvv_selectors, cvv, timeout=5000
-    ) or _fill_by_label_fallback(page, ["CVV", "CVC", "Security code"], cvv, timeout=5000) or _fill_with_fallback(
-        page, cvv_selectors, cvv, timeout=5000
+    _ = (
+        _fill_dom_ids(page, ["cardCvv", "cvv", "cvc"], cvv)
+        or _fill_visible_input(page, cvv_selectors, cvv, timeout=5000)
+        or _fill_by_label_fallback(page, ["CVV", "CVC", "Security code"], cvv, timeout=5000)
+        or _fill_with_fallback(page, cvv_selectors, cvv, timeout=5000)
     )
     print(f"[*] CVV filled")
     time.sleep(random.uniform(0.5, 1.0))

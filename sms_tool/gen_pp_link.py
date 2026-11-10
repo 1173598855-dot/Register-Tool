@@ -39,7 +39,7 @@ from .upi_link import (  # noqa: F401
     generate_upi_qr_link,
 )
 
-__all__ = [
+__all__ = [  # pyright: ignore[reportUnsupportedDunderAll] -- composed from the two lanes on purpose
     *_paypal_link_all,
     "STRIPE_PAYMENT_PAGE_CONFIRM_URL_T",
     "STRIPE_PAYMENT_PAGE_GET_URL_T",

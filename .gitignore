@@ -146,3 +146,9 @@ local/*
 # 迁移进 sms_tool/paypal/ 后，PROJECT_ROOT 少一层时默认的 runtime/ 状态文件
 # 会落到这里。它既不是 runtime/ 那份活状态，也不该被提交。
 /sms_tool/runtime/
+
+# === 仓库根目录不许放打包产物（属于 dist/）；见 docs/current/entry-points.md ===
+/*.exe
+/*.msi
+/*.zip
+/*.7z
