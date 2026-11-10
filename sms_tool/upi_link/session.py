@@ -306,7 +306,7 @@ def _upi_account_id_from_token(token: str) -> str:
         payload = json.loads(base64.urlsafe_b64decode(padded))
         auth = payload.get("https://api.openai.com/auth") or {}
         return str(auth.get("chatgpt_account_id") or payload.get("chatgpt_account_id") or "")
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # not base64url JSON, or a payload that is not a mapping
         return ""
 
 

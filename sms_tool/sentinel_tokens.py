@@ -141,7 +141,7 @@ def _sentinel_device_id(sentinel_data):
     try:
         token = json.loads(str(data.get("sentinel_token") or "{}"))
         return str(token.get("id") or "").strip()
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # not JSON, or a token object that is not a mapping
         return ""
 
 
