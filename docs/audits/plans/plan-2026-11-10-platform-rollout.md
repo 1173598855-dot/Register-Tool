@@ -235,6 +235,23 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 那是一次 lane 级决策，不是一次 per-file 切片。所以这条轴的推进顺序是：
 **先做跨泳道的结构回退类，再单独立项处理泳道内的宽 handler。**
 
+### 安全类的筛选口径（可复算）
+
+一次 AST 扫描把这批候选挑出来，五个条件同时成立才算：
+
+1. 文件不在 `sms_tool/auth_flow/` 或 `sms_tool/registration/`；
+2. handler 行没有 `# broad-except:` 标记；
+3. handler 体是**单条 `return <默认值>`**（`None` / `""` / `0` / `False` / 空容器 / 字面量 dict）；
+4. 返回的 dict 字面量**不含** `ok` / `status` / `error` / `quota_status` / `retryable` /
+   `error_stage` / `proxy_source` —— 那些是探针失败结果，属于传输判定，不能收窄；
+5. try 体前后 14 行内没有 `request_with_retry` / `curl_requests` / `session.get(` /
+   `session.post(` / `requests.get(` / `requests.post(`。
+
+用它得到 **101 个候选**（175 → 101）。已收窄的 8 处来自 `http_utils`（3）、
+`wham_usage`、`account_seed`、`geo/clock`（4）、`k12_identity`、`codex_sentinel`——
+**959 → 948**。收窄时按"这个形状实际能抛什么"写元组，并在注释里说明为什么
+传输错误故意不在里面。
+
 ---
 
 ## Phase 7 — 回答最初的问题：账号级风控（1–2 个工作日 + 成本）
