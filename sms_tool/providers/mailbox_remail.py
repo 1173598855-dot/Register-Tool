@@ -922,7 +922,7 @@ def _remail_fetch_state(response):
             "next_allowed_delay": _remail_parse_fetch_next_allowed(response),
             "last_safe_error": str(fetch_info.get("lastSafeError") or "").strip(),
         }
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # response or fetch block is not a mapping
         return {"last_status": "", "last_received_at": "", "next_allowed_delay": 0.0, "last_safe_error": ""}
 
 

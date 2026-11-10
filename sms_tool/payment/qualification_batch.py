@@ -512,7 +512,7 @@ def _proxy_fingerprint(proxy: str | None) -> dict[str, str]:
             "proxy_session": session,
             "proxy_fingerprint": f"{host_label}#sid-{session}",
         }
-    except Exception:
+    except (AttributeError, TypeError, ValueError):  # urlsplit rejects the value; parsed.port may be invalid
         return {"proxy_host": "", "proxy_session": "", "proxy_fingerprint": ""}
 
 

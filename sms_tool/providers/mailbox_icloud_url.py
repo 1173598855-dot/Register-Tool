@@ -393,7 +393,7 @@ def _load_json_payload(text: str) -> Any:
         return None
     try:
         return json.loads(stripped)
-    except Exception:
+    except (TypeError, ValueError):  # not a JSON body; already known to start with [ or {
         return None
 
 
@@ -679,7 +679,7 @@ def _decode_mail_body(value: Any) -> str:
     try:
         raw = base64.b64decode(payload, validate=False) if ";base64" in metadata.lower() else unquote_to_bytes(payload)
         return raw.decode("utf-8", errors="replace")
-    except Exception:
+    except (TypeError, ValueError):  # binascii.Error derives from ValueError; a body that is not bytes/text
         return ""
 
 
@@ -689,10 +689,10 @@ def _iso_datetime(value: Any) -> str:
         return ""
     try:
         parsed = parsedate_to_datetime(text)
-    except Exception:
+    except (TypeError, ValueError):  # RFC 2822 that this host cannot parse
         try:
             parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-        except Exception:
+        except (TypeError, ValueError):  # not ISO 8601 either
             return ""
     return parsed.isoformat()
 
