@@ -41,7 +41,7 @@
     "sms_tool/mailbox -> sms_tool/providers": 16,
     "sms_tool/pay_link -> sms_tool": 6,
     "sms_tool/pay_link -> sms_tool/kernel": 3,
-    "sms_tool/pay_link -> sms_tool/payment": 19,
+    "sms_tool/pay_link -> sms_tool/payment": 13,
     "sms_tool/payment -> sms_tool": 11,
     "sms_tool/payment -> sms_tool/kernel": 3,
     "sms_tool/payment -> sms_tool/proxy": 1,
@@ -83,6 +83,6 @@
     "sms_tool/upi_link -> sms_tool/paypal": 1,
     "sms_tool/upi_link -> sms_tool/proxy": 3
   },
-  "total_module_edges": 465,
+  "total_module_edges": 459,
   "type_only_edges": 15
 }

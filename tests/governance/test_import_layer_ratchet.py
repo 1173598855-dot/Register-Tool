@@ -451,13 +451,14 @@ def test_summary_facts_are_pinned():
         # edge was a minority direction (root module -> subpackage), so it leaves both
         # counters.
         #
-        # 471 -> 465 (pairs and minority unchanged): the legacy ``pay_link`` director
-        # carried the pre-split monolith's whole import header in every shard. Three of
-        # them -- adapters, base, registry -- held dead references into
-        # ``payment.catalog`` / ``payment.operation`` / ``payment.routing`` that no
-        # reader, no patch target and no re-export used, so deleting them removes six
-        # coupling edges between a legacy shell and the payment package.
-        "total_module_edges": 465,
+        # 471 -> 465 -> 459 (pairs and minority unchanged): the legacy ``pay_link``
+        # director carried the pre-split monolith's whole import header in every shard.
+        # Five shards (adapters, base, registry, then normalize and persistence) held
+        # dead references into ``payment.catalog`` / ``payment.operation`` /
+        # ``payment.routing`` that no reader, no patch target and no re-export used, so
+        # deleting them removes twelve coupling edges between a legacy shell and the
+        # payment package.
+        "total_module_edges": 459,
         "ordered_pairs": 78,
         "mutual_pairs": 17,
         "minority_edges": 45,

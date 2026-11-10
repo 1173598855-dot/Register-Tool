@@ -12,7 +12,7 @@
 
 | 指标 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
-| `import-layer` 模块级边 / 目录对 | 473 / 78 | **465 / 78** | `python scripts/import_layer_ratchet.py` |
+| `import-layer` 模块级边 / 目录对 | 473 / 78 | **459 / 78** | `python scripts/import_layer_ratchet.py` |
 | ↳ 其中 mutual / minority / delayed | 17 / 46 / 307 | 17 / 45 / 307 | 同上 |
 | `delayed-import` statements / edges | 473 / 362 | 473 / 362 | `python scripts/delayed_import_ratchet.py` |
 | ↳ 分类 | cycle 8 / startup 105 / provider 37 / deferred 212 | 同 | 同上 |
@@ -34,10 +34,10 @@
 2. 472 → 471（minority 46 → 45）：`cli.py` 里一条从未被使用的
    `from .registration_drivers.base import driver_choices` —— 真正的消费方是
    `cli_parsers/core.py`，它自己直接导入；
-3. 471 → 465：`pay_link` 三个 legacy 分片（`adapters`/`base`/`registry`）里，
-   拆分前主模块留下的 `payment.catalog` / `payment.operation` / `payment.routing`
-   死引用被删掉 —— 六条 legacy shell → `payment.*` 的边随之消失（`pairs` 与
-   `minority` 均不变）。
+3. 471 → 465 → 459：`pay_link` 五个 legacy 分片（`adapters`/`base`/`registry`，随后
+   `normalize`/`persistence`）里，拆分前主模块留下的 `payment.catalog` /
+   `payment.operation` / `payment.routing` 死引用被删掉 —— 十二条 legacy shell →
+   `payment.*` 的边随之消失（`pairs` 与 `minority` 均不变）。
 
 理由都写在 `tests/governance/test_import_layer_ratchet.py` 的固定数字注释里。
 
@@ -45,7 +45,7 @@
 
 | 债 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
-| unused import | 256（基线 257） | **61**（14 文件） | `python scripts/unused_import_ratchet.py` |
+| unused import | 256（基线 257） | **41**（12 文件） | `python scripts/unused_import_ratchet.py` |
 | broad except | 959 / 158 silent（预算 960/158） | **891 / 158**（预算 891/158） | `python scripts/broad_except_ratchet.py` |
 
 两条轴的推进方式与**边界**（都已写进方案）：
@@ -53,7 +53,7 @@
 - **broad-except**：跨泳道的结构性回退（解析、类型强转、属性探测）已做完；剩下的 39 个候选
   逐个人工核对后**多数必须保留**（包的是调用 / 返回探针失败字典 / 自然元组是
   `INTERNAL_EXCEPTION_TYPES` 的子集）。再往下走是泳道级决策，不是 per-file 切片。
-- **unused-import**：剩下的 61 条集中在六类**接缝**上，按类列出。`tests/` 那 32 条已全部
+- **unused-import**：剩下的 41 条集中在六类**接缝**上，按类列出。`tests/` 那 32 条已全部
   清掉（不含任何接缝：逐个确认既不是 patch 目标也不是再导出，`_browser_heartbeat` 那类
   只在**字符串路径**里被 patch，不需要本地导入）。facade 一类已用**声明**而不是删除处理了
   两处：`upi_link/pipeline.py`（70 个名，−71）与 `paypal_link/gen_link.py`（22 个名 +
@@ -71,7 +71,7 @@
 | 兄弟模块反向导入做接缝 | `mailbox/router.py`（7）、`accounts/account_recovery.py`（5） | `grep -r 'from \.<module> import <name>'` 命中 |
 | 依赖可用性探针 | `paypal/orchestrator.py`（2） | ruff 自己的建议文案就写着 "consider using `importlib.util.find_spec`" |
 
-### patch 面的处理策略（2026-11-11 定，`pay_link` 共 −29）
+### patch 面的处理策略（2026-11-11 定，`pay_link` 共 −49）
 
 `pay_link` 是 `payment/link_manager.py` 的机械拆分，每个分片都把拆分前的**整段 import
 头**抄了一遍，于是 ruff 在每个分片各报 ~11 条。这批必须先分清两件事：
@@ -79,9 +79,10 @@
 | 判据 | 结论 | 数量 |
 | --- | --- | --- |
 | `tests/` 里存在 `patch("sms_tool.pay_link.<分片>.<name>")` | **保留并就地声明**（`# noqa: F401 - patch seam: …`），因为属性存在本身就是契约 | 5（`current_config_data` ×5） |
-| 没有 patch、没有读者、没有再导出 | **删除**（整块 import 只服务拆分前的主模块） | 24 |
+| 没有 patch、没有读者、没有再导出 | **删除**（整块 import 只服务拆分前的主模块） | 44 |
 
-这样做的副作用是**耦合数一起降**：`import-layer` 471 → 465（六个 legacy shell → `payment.*`
+这样做的副作用是**耦合数一起降**：`import-layer` 471 → 465 → 459（十二条 legacy shell →
+`payment.*`
 的死边消失），`pairs`/`minority` 不变。删除前必须先跑 pyright，因为它能看见
 `pay_link/__init__.py` 这类**反向再导出**：本轮 `parse_proxy_pool` 就是这样被抓回来的
 （`__init__` 从 `registry` 取它），现在同样就地标了 `# noqa`。
