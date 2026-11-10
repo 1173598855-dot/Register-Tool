@@ -29,7 +29,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 拆 4 个 commit：packs 选择器+批处理接线 / 台账分片 / 入口清单+分组 / 全量修复+仓库整理 | 24 个文件 | `git log` 四个主题清晰，每个 commit 树可 import |
 | 0.2 | 推 `fork/main` | — | 远端哈希 = 本地 |
-| 0.3 | 记录基线快照到 `docs/audits/records/` | 新文件 | 上述表格成为可比对的数字 |
+| 0.3 | 记录基线快照到 `docs/audits/records/` | 新文件 | 上述表格成为可比对的数字 —— **✅ `baseline-2026-11-11-platform-rollout.md`** |
 
 **风险**：无。**回滚**：`git reset --hard` 到 `83b59e8`。
 
@@ -219,6 +219,11 @@ pyright 看不见"运行时是否需要"，两个工具各识一半。
 本轮因此放过了 `external_sessions/__init__.py` 从 `managed.py` 反向导入
 `MOZ_DISABLE_CONTENT_SANDBOX` 这一处，被 pyright 抓住才回滚。**改用
 `Select-String -Path sms_tool -Recurse`**。
+
+**到 2026-11-11（256 → 227），这条轴也到边界**：剩下的 227 条集中在**六类接缝**上，
+逐类的识别判据与样例见 `docs/audits/records/baseline-2026-11-11-platform-rollout.md` §2。
+和 broad-except 一样，再往下是**结构性决策**（要不要给 facade 补 `__all__` 让 ruff 不再报、
+要不要把 patch 面收到单一 seam 模块），不是 per-file 清理。
 
 **每一片的固定做法**（四步，缺一不可）：
 
