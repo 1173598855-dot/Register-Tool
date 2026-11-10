@@ -45,6 +45,7 @@ from .loader import (
     load_builtin_registry,
     load_manifest,
     load_registry,
+    reset_registry_cache,
 )
 from .registry import LegacyProviderPack, PackRegistry
 
@@ -75,6 +76,7 @@ __all__ = [
     "load_registry",
     "pack_detail",
     "pack_rows",
+    "reset_registry_cache",
     "resolve_capability_entrypoint",
     "verify_pack",
     "verify_registry",

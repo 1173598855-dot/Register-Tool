@@ -757,4 +757,34 @@ public sealed class BackendCommandPlannerTests
         Assert.All(first.TempFiles.Concat(second.TempFiles), path =>
             Assert.Equal(fixture.Path, Path.GetDirectoryName(path)));
     }
+
+    /// <summary>
+    /// ``--pack`` is the only backend flag that selects a registration
+    /// architecture, and the planner is the only place allowed to emit it.
+    /// </summary>
+    [Fact]
+    public void AppendPack_AddsTheFlagAndValue()
+    {
+        var args = new List<string>();
+
+        BackendCommandPlanner.AppendPack(args, "acme.portal");
+
+        Assert.Equal(new[] { "--pack", "acme.portal" }, args);
+    }
+
+    /// <summary>
+    /// A blank selection is a no-op on purpose: the Python side then resolves the
+    /// single claimant, or reports the ambiguity itself. Emitting an empty value
+    /// would be a routing decision nobody made.
+    /// </summary>
+    [Fact]
+    public void AppendPack_IgnoresBlankValues()
+    {
+        var args = new List<string>();
+
+        BackendCommandPlanner.AppendPack(args, "   ");
+        BackendCommandPlanner.AppendPack(args, null);
+
+        Assert.Empty(args);
+    }
 }

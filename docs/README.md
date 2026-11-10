@@ -56,6 +56,10 @@ Directory layout (since 2026-09-06):
   如何安装与运行、修一条类型错误的首选写法。
 - [C# Gates](current/dotnet-gates.md) - C# 构建告警门禁：零基线、为什么解析控制台
   而不是编译器 SARIF、`--update-baseline` 的使用条件与修复一条告警的写法。
+- [Provider Packs](current/provider-packs.md) - provider-pack 平台：manifest 契约、
+  派生命名空间、生命周期钩子、运维入口与迁移路线。
+- [Entry Points](current/entry-points.md) - 全部入口（CLI / 桌面 / 服务 / 脚本）的
+  分类与状态、"新入口放哪"的决策树，由 `scripts/entry_point_ratchet.py` 执法。
 - [Testing](current/testing.md) - 测试执行：并行分片（`-n 4 --dist loadfile`）
   的实测收益、为什么 `tests/registration` + `tests/workbench` 仍是独立串行进程。
 - [Randomness](current/randomness.md) - `random` vs `secrets` 的判据、已复核调用点与

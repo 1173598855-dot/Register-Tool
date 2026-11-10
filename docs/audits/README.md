@@ -49,7 +49,7 @@ from `docs/README.md`.
 
 ## Contents
 
-77 files. Grouped by kind; newest first within each group.
+78 files. Grouped by kind; newest first within each group.
 
 > Recount: `find docs/audits -type f ( -name "*.md" -o -name "*.txt" ) | wc -l` (the README itself is counted) — this number is
 > pinned by `tests/test_audits_readme_index.py`, which fails when it and the
@@ -120,6 +120,7 @@ from `docs/README.md`.
 
 | File | Date | Subject |
 | --- | --- | --- |
+| `plan-2026-11-10-platform-rollout.md` | 11-10 | 多架构平台化收口：**九 Phase 一次性完整方案（待批准）**。Phase 0 收口（拆提交 + 推 fork + 基线快照）→ Phase 1 分类-执法补完（包根 79 模块分组 + `dispatch` 读盘缓存 + `--pack` 打通到 Contracts）→ Phase 2 六个能力真正接线（现在只有 `account.health` 有生产调用方）→ Phase 3 第二套架构（唯一能证明抽象成立的事）→ Phase 4 迁存量 → Phase 5 产品面 → Phase 6 技术债按文件退坡（不批量，审计记录批量清理失败两次）→ Phase 7 账号级风控体检（仓库唯一没有数据支撑的结论）→ Phase 8 内核产品化。含依赖图、每 Phase 的统一验收命令、明确不做清单，以及 Phase 3 选平台时必须先过的合规边界 |
 | `plan-2026-10-28-wpf-visual-system.md` | 10-28 | WPF 视觉系统重构（**Phase 0–5 全部落地**）：把 FlClash 的设计准则（`.agents/surfaces.md`）压成可执行的令牌层 —— 5 级表面 + 3 级文字 + 圆角/间距/字阶刻度，色板从「XAML 一份 + C# 120 行 `SetBrush`」改为两个同键集字典做运行时替换；结构性描边清零（只留输入框、焦点环、chrome 分界），颜色只表状态（主按钮填充、徽章颜色落到文字、选中行改为 primary 竖条），表格密度重做并加「精简列」，控制台改为可拖。**立项时的一处前提被代码推翻**：侧栏 19 项全是动作而非导航目的地，故不做「选中态」，改为真实的**运行中标记**（`ActiveNavKey` 由批次 funnel 提升/清除）；23 个内联字形收敛到 `Glyphs.xaml`、取消行仅运行中染危险色、内容区 <960px 时表格自动换两行卡片（与表格共用数据源/选区/勾选语义）。实测 `dotnet build` 0 warning、`dotnet test` 622 passed；文中同时记录了两个当场修掉的自身缺陷（`Radius.*` 误用于 `CornerRadius`、相对 URI 在测试宿主解析失败） |
 | `plan-2026-10-25-wpf-row-status-decoupling.md` | 10-25 | WPF 账号行**状态判定去展示串**立项（**未落地**）：P1-2 已用 `Loc.DisplayContains` 消掉「英文界面下判定失效」的语言变量，但根因仍在 —— 判定仍解析 `Loc.T` 渲染后的展示串，一次文案改写就会静默改变业务判定，同一事实在 Python（`registration_status` / `at_probe_status`）与 C#（展示串）各存一份。提案把判据搬到 `Contracts/AccountRowState`（无 WPF 依赖、可 xunit 直测），`PoolRow` 持机器态，`Views/` 只做渲染；含 5 条可自动验的判据（`grep -c "Contains(\"已" → 0`、每个机器码一条不经过 `Loc` 的用例、Python↔C# 机器码 fixture、现有展示测试作回归基线）、4 条明确不做（不改 Python 状态产出 / 不动 `Loc` 键形态 / 不合并 `MainWindow` 分部类 / 不为迁移顺手改文案）、S1–S5 分步回滚点与两个待答（未知状态的兜底方向、`AccountType` 子串判定的跨语言契约） |
 | `plan-2026-10-24-mainwindow-and-handlers-decomposition.md` | 10-24 | `MainWindow.xaml`（874 行）与 `registration/handlers.py`（1175 行 / 56 方法）的**拆分方案；A0–A5、B1–B4 全部落地**。实测先纠正两处旧认知：XAML 侧 code-behind 只引用 **8 个 `x:Name`**（不是 23），`handlers.py` 已有 **31 个 2 行委托**、真正的方法体只剩 **703 代码行**。方案 A 的 A0–A5 全部落地（窗口 874 → 54 行，五个 UserControl），每步列出必须迁移的 `x:Name`、`StaticResource` 跨字典（仅 `SidebarNavButtonStyle` 的 `{x:Type Button}` 一处）和 smoke test 断言；方案 B 的 bootstrap / identity / auth / register 全部落地（`handlers.py` 1175 → 506 行），`handlers.py` 保留阶段顺序与 31 个委托，**19 个实例化测试文件（31 个引用）**与 **10 处 `patch("...handlers.<name>")`（6 个名字）**是硬 seam（清单逐条列出）。落地实测：`MainWindow.xaml` 874 → 54 行，`handlers.py` 1175 → 506 行（`bootstrap_stages.py` 148、`identity_stages.py` 272、`auth_stages.py` 176、`register_stages.py` 277），全量 pytest 6859 passed / `dotnet test` 548 passed。含逆向 AST 往返等价证明、每阶段门禁与回滚点、明确不做 5 条、8–10 个工作日估算 |

@@ -803,6 +803,29 @@ namespace SmsWorkbench
             args.Add(value);
         }
 
+        /// <summary>
+        /// Append the provider-pack selection.
+        /// <para>
+        /// This is the only place a plan may emit <c>--pack</c>; window partials
+        /// call it instead of adding the literal, so the backend-flag vocabulary
+        /// stays in this file (see the Contracts row of docs/directory-map.md).
+        /// </para>
+        /// <para>
+        /// An empty id is a deliberate no-op. The Python side then resolves the
+        /// single claimant, or reports the ambiguity naming <c>--pack</c> and
+        /// <c>GPT_PACK_ID</c> -- which is what the default single-pack build
+        /// wants. A plan that emitted an empty value would be a routing decision
+        /// nobody made.
+        /// </para>
+        /// </summary>
+        public static void AppendPack(List<string> args, string? packId)
+        {
+            string value = (packId ?? "").Trim();
+            if (value.Length == 0) return;
+            args.Add("--pack");
+            args.Add(value);
+        }
+
         private static void AppendRegistrationAtOnly(List<string> args)
         {
             args.Add("--registration-at-only");

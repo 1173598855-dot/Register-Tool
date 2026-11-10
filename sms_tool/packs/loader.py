@@ -15,6 +15,7 @@ core cannot dispatch must not be half-registered.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections.abc import Iterable, Mapping
@@ -30,6 +31,10 @@ EXTERNAL_PACK_PATH_ENV = "GPT_PACK_PATH"
 MANIFEST_FILENAME = "manifest.json"
 
 BUILTIN_PACK_DIR = Path(__file__).with_name("builtin")
+
+#: Memoised ambient registries: signature -> registry. One entry, cleared on a
+#: rebuild; see :func:`load_registry` for why explicit roots bypass it.
+_CACHE: dict[tuple[tuple[str, int, str], ...], PackRegistry] = {}
 
 
 def load_manifest(path: str | Path) -> PackManifest:
@@ -82,16 +87,64 @@ def load_registry(roots: Iterable[Path] | None = None) -> PackRegistry:
 
     Manifests are validated before any registry is built, so a broken pack fails
     the whole load with the offending file named instead of silently vanishing.
+
+    The *ambient* resolution (``roots is None``, i.e. builtin + ``GPT_PACK_PATH``)
+    is memoised on ``(path, mtime_ns, size)`` for each manifest. Without it every
+    capability dispatch re-read and re-validated every manifest, which in a
+    100-account batch is 100 rounds of JSON parsing for a file that did not
+    change. An explicit ``roots`` argument is never cached: tests and the
+    management surface pass their own roots precisely because they want the
+    value they asked for.
     """
-    packs = [LegacyProviderPack(load_manifest(path)) for path in discover_manifest_paths(roots)]
+    paths = discover_manifest_paths(roots)
+    if roots is not None:
+        return _build_registry(paths)
+
+    signature = _signature(paths)
+    cached = _CACHE.get(signature)
+    if cached is not None:
+        return cached
+    registry = _build_registry(paths)
+    # One entry is enough: there is only one ambient resolution per process.
+    _CACHE.clear()
+    _CACHE[signature] = registry
+    return registry
+
+
+def _signature(paths: tuple[Path, ...]) -> tuple[tuple[str, int, str], ...]:
+    """Identity of the manifest set: path, size and content digest.
+
+    A digest rather than ``mtime``: an edit that keeps the byte count (``1.0.0``
+    to ``1.0.1``) is a real change a timestamp may miss on a coarse or cached
+    filesystem, and hashing a two-kilobyte file is far cheaper than the parse and
+    validation this cache exists to skip. A manifest that cannot be read is left
+    out of the signature, so the rebuild reports it as the error it is.
+    """
+    signature: list[tuple[str, int, str]] = []
+    for path in paths:
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        signature.append((str(path), len(raw), hashlib.sha256(raw).hexdigest()))
+    return tuple(signature)
+
+
+def _build_registry(paths: tuple[Path, ...]) -> PackRegistry:
+    packs = [LegacyProviderPack(load_manifest(path)) for path in paths]
     seen: dict[str, Path] = {}
-    for path, pack in zip(discover_manifest_paths(roots), packs):
+    for path, pack in zip(paths, packs):
         if pack.manifest.id in seen:
             raise PackManifestError(
                 f"duplicate provider pack id {pack.manifest.id!r}: {seen[pack.manifest.id]} and {path}"
             )
         seen[pack.manifest.id] = path
     return PackRegistry(packs)
+
+
+def reset_registry_cache() -> None:
+    """Drop the memoised ambient registry (tests, and an operator hot-reload)."""
+    _CACHE.clear()
 
 
 def load_builtin_registry() -> PackRegistry:
