@@ -173,12 +173,12 @@ Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同�
 
 **只按单文件退，不批量**——仓库审计已记录批量清理失败两次并整批回滚。
 
-| 债 | 现状 | 目标 |
-| --- | --- | --- |
-| unused import | 256（基线 257） | 每轮拿 1–2 个文件清零，`--update-baseline` 降 |
-| broad except | 959 / 158 silent（预算 960/158） | 按 lane 逐条窄化到 `TRANSPORT_ERRORS`，标记 `# broad-except:` |
-| deferred import | 212 | 能提到模块级的提；提不了的保持并留理由 |
-| same-named divergent | 34 | 逐对判断是"分层"还是"复制" |
+| 债 | 开工时 | **现在（2026-11-11，13 片后）** | 目标 |
+| --- | --- | --- | --- |
+| unused import | 256（基线 257） | **237**（60 文件） | 逐文件清，`--update-baseline` 只许降 |
+| broad except | 959 / 158 silent（预算 960/158） | **898 / 158（预算 898/158）** | 跨泳道结构回退先行；泳道内的宽 handler 单独立项 |
+| deferred import | 212 | 212 | 能提到模块级的提；提不了的保持并留理由 |
+| same-named divergent | 34 | 34（271 个同名 def：237 委派 / 0 相同 / 34 分歧） | 逐对判断是"分层"还是"复制" |
 
 ### unused import 退坡实测（2026-11-11）：剩下的多数是**接缝**，不是死代码
 
@@ -247,12 +247,13 @@ except (AttributeError, TypeError):               # cookie jar 不可迭代 / �
 5. try 体前后 14 行内没有 `request_with_retry` / `curl_requests` / `session.get(` /
    `session.post(` / `requests.get(` / `requests.post(`。
 
-用它得到 **101 个候选**（175 → 101）。已收窄的 8 处来自 `http_utils`（3）、
-`wham_usage`、`account_seed`、`geo/clock`（4）、`k12_identity`、`codex_sentinel`——
-**959 → 948**。收窄时按"这个形状实际能抛什么"写元组，并在注释里说明为什么
-传输错误故意不在里面。
+用它第一遍得到 **101 个候选**（175 → 101），每片重跑一次以跟上行号位移——
+到第 13 片时只剩 **54 个**。已收窄的 61 处分布在 20 个文件里，累计 **959 → 898**
+（`http_utils` 3、`geo/clock` 4、`mailbox_icloud_url` 4、`session_converter` 4、
+`codex_export` 4、其余每文件 1–3）。收窄时按"这个形状实际能抛什么"写元组，
+并在注释里说明为什么传输错误故意不在里面。
 
-### 收窄时还会撞到的两道门禁（2026-11-11 实测）
+### 收窄时还会撞到的四道门禁（2026-11-11 实测）
 
 选目标只是第一步，写下去时还有两条约束，都必须**在提交前**撞过一次才知道：
 
