@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections.abc import Mapping
-import time
 import uuid
 import threading
 from urllib.parse import urlsplit
