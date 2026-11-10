@@ -12,7 +12,6 @@ from typing import Any
 from collections.abc import Mapping
 from types import SimpleNamespace
 import json
-import time
 import uuid
 from ._extract import (
     _upi_custom_payment_method_id,
@@ -555,3 +554,83 @@ def generate_upi_qr_link(
             f"({result.get('error_code') or 'unknown'}); reopening on a fresh exit",
         )
     return result if result is not None else {"ok": False, "error_code": "upi_qr_failed"}
+
+
+# ── Public surface ─────────────────────────────────────────────────────────
+# These names are imported into this module on purpose: the stage body in
+# `stages.py` resolves them out of THIS module's namespace at call time (see the
+# seam note further up), and tests patch `sms_tool.upi_link.pipeline.<name>`.
+# Declaring them is what makes that intent checkable, instead of leaving ruff to
+# report 72 "unused" imports that are in fact this module's reason to exist.
+__all__ = [
+    "CHATGPT_CHECKOUT_PATH",
+    "CHATGPT_TIMEOUT",
+    "DEFAULT_STRIPE_PK",
+    "DEFAULT_TIMEOUT",
+    "PLUS_TRIAL_CAMPAIGN_ID",
+    "STRIPE_PAYMENT_PAGE_CONFIRM_URL_T",
+    "STRIPE_PAYMENT_PAGE_GET_URL_T",
+    "STRIPE_VERSION",
+    "UPI_CHECKOUT_APPROVE_URL",
+    "UPI_VERIFY_INCONCLUSIVE",
+    "_upi_verify_instructions_verdict",
+    "UPI_CHECKOUT_CONFIRM_URL",
+    "UPI_CHECKOUT_URL",
+    "UPI_SENTINEL_APPROVAL_FLOW",
+    "_UPI_ADMISSION_PATHS",
+    "_UPI_PRECONFIRM_RETRY_CODES",
+    "_approve_backoff",
+    "_new_session",
+    "_normalize_hosted_checkout_url",
+    "_upi_account_id_from_token",
+    "_upi_apply_approve_risk",
+    "_upi_apply_fingerprint",
+    "_upi_browser_approve",
+    "_upi_build_confirm_body",
+    "_upi_build_ctx",
+    "_upi_capture_risk_context",
+    "_upi_classify_failure",
+    "_upi_confirm_local_mandate",
+    "_upi_create_upi_pm",
+    "_upi_custom_payment_method_id",
+    "_upi_dump_http",
+    "_upi_elements_session",
+    "_upi_elements_session_params",
+    "_upi_ensure_checkout_flow",
+    "_upi_extract_next_action",
+    "_upi_extract_qr_candidates",
+    "_upi_extract_redirect_url",
+    "_upi_fetch_oaics_state",
+    "_upi_find_submission_attempt",
+    "_upi_first_value_by_key",
+    "_upi_get_free_trial_status",
+    "_upi_hosted_fallback_result",
+    "_upi_hydrate_qr_data",
+    "_upi_india_exit_attempts",
+    "_upi_india_exit_probe_enabled",
+    "_upi_india_exit_timeout",
+    "_upi_is_403",
+    "_upi_is_instructions_url",
+    "_upi_link_unverified_contract",
+    "_upi_new_chatgpt_session",
+    "_upi_passive_captcha_fields",
+    "_upi_poll_payment_page",
+    "_upi_post_with_degrade",
+    "_upi_promo_page_url",
+    "_upi_qr_image_kind",
+    "_upi_raise_if_setup_intent_blocked",
+    "_upi_rebuild_ctx",
+    "_upi_record_zero_result",
+    "_upi_register_stripe_fingerprint",
+    "_upi_repeat_tax_region",
+    "_upi_resolve_external_redirect",
+    "_upi_run_cpmt_flow",
+    "_upi_run_oaics_flow",
+    "_upi_sentinel_headers",
+    "_upi_sentinel_ping",
+    "_upi_server_mandate",
+    "_upi_should_retry_second_confirm",
+    "_upi_stripe_init",
+    "_upi_wait_paid",
+    "_write_qr_png",
+]

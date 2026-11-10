@@ -27,7 +27,7 @@
     "sms_tool/registration/register_stages.py": 1,
     "sms_tool/registration_drivers/external_sessions/__init__.py": 11,
     "sms_tool/registration_drivers/external_sessions/managed.py": 1,
-    "sms_tool/upi_link/pipeline.py": 72,
+    "sms_tool/upi_link/pipeline.py": 1,
     "tests/accounts/test_account_email_change.py": 2,
     "tests/accounts/test_account_promotion.py": 1,
     "tests/accounts/test_failure_registry.py": 1,
@@ -56,5 +56,5 @@
     "tests/workbench/test_cli_registration_driver.py": 1,
     "tests/workbench/test_operator_output.py": 1
   },
-  "total": 227
+  "total": 156
 }
