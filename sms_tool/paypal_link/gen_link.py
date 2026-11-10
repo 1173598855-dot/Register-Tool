@@ -164,7 +164,7 @@ def _load_json(path: str) -> dict:
         with open(path, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
-    except Exception:
+    except (OSError, ValueError):  # unreadable file, or a body that is not JSON
         return {}
 
 

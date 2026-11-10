@@ -790,7 +790,7 @@ def rotate_proxy_session_id(proxy: str) -> str:
 def is_paypal_ba_approve_url(url: str) -> bool:
     try:
         parsed = urlsplit(url)
-    except Exception:
+    except (TypeError, ValueError):  # not a URL the splitter accepts
         return False
     host = (parsed.netloc or "").lower()
     if not (host == "paypal.com" or host.endswith(".paypal.com")):

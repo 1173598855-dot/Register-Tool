@@ -218,7 +218,7 @@ def _read_dead_remail_registry():
         return []
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):  # unreadable registry, or a body that is not JSON
         return []
     records = payload.get("accounts") if isinstance(payload, dict) else payload
     return [item for item in (records or []) if isinstance(item, dict)]
@@ -896,7 +896,7 @@ def _remail_parse_fetch_next_allowed(response):
         dt = datetime.fromisoformat(next_allowed.replace("Z", "+00:00"))
         wait = dt.timestamp() - time.time()
         return max(0.0, wait)
-    except Exception:
+    except (AttributeError, OSError, OverflowError, TypeError, ValueError):  # not a timestamp, or out of range
         return 0.0
 
 

@@ -406,7 +406,7 @@
       "silent": 0
     },
     "sms_tool/paypal_link/gen_link.py": {
-      "broad": 6,
+      "broad": 5,
       "silent": 0
     },
     "sms_tool/paypal_link/reconciliation.py": {
@@ -434,7 +434,7 @@
       "silent": 1
     },
     "sms_tool/pp_link_helpers.py": {
-      "broad": 4,
+      "broad": 3,
       "silent": 0
     },
     "sms_tool/providers/cfworker_client.py": {
@@ -458,7 +458,7 @@
       "silent": 0
     },
     "sms_tool/providers/mailbox_remail.py": {
-      "broad": 16,
+      "broad": 14,
       "silent": 1
     },
     "sms_tool/providers/mailbox_smailr.py": {
@@ -694,7 +694,7 @@
       "silent": 0
     },
     "sms_tool/upi_link/config.py": {
-      "broad": 2,
+      "broad": 1,
       "silent": 0
     },
     "sms_tool/upi_link/dump.py": {
@@ -768,11 +768,11 @@
         "reason": "The protocol lane is where a swallowed exception is indistinguishable from a protocol failure: it lands in the funnel as 'unknown' while the batch keeps spending mailboxes. Silent handlers are 0 here and the broad count may only shrink."
       }
     },
-    "max_broad": 927,
+    "max_broad": 922,
     "max_silent": 158
   },
   "totals": {
-    "broad": 927,
+    "broad": 922,
     "silent": 158
   },
   "whitelist": {
