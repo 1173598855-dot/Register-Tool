@@ -6,7 +6,7 @@ import os
 import time
 from pathlib import Path
 from typing import Any
-from ..config import current_config_data
+from ..config import current_config_data  # noqa: F401 - patch seam: tests patch this module's copy
 from ..payment.contracts import payment_history_metadata
 from ..payment.catalog import (
     PAYMENT_METHODS as CATALOG_METHODS,

@@ -5,12 +5,8 @@
     "sms_tool/account_creation.py": 1,
     "sms_tool/accounts/account_recovery.py": 5,
     "sms_tool/mailbox/router.py": 7,
-    "sms_tool/pay_link/adapters.py": 11,
-    "sms_tool/pay_link/base.py": 9,
-    "sms_tool/pay_link/core.py": 1,
-    "sms_tool/pay_link/normalize.py": 11,
-    "sms_tool/pay_link/persistence.py": 11,
-    "sms_tool/pay_link/registry.py": 6,
+    "sms_tool/pay_link/normalize.py": 10,
+    "sms_tool/pay_link/persistence.py": 10,
     "sms_tool/paypal/orchestrator.py": 2,
     "sms_tool/pp_link_helpers.py": 9,
     "sms_tool/registration/auth_stages.py": 1,
@@ -19,5 +15,5 @@
     "sms_tool/registration_drivers/external_sessions/__init__.py": 11,
     "sms_tool/registration_drivers/external_sessions/managed.py": 1
   },
-  "total": 90
+  "total": 61
 }

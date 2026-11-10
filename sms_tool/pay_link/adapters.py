@@ -13,25 +13,9 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
-from ..config import current_config_data
+from ..config import current_config_data  # noqa: F401 - patch seam: tests patch this module's copy
 from ..kernel.paths import runtime_file
 from ..payment.errors import annotate_error
-from ..payment.catalog import (
-    PAYMENT_METHODS as CATALOG_METHODS,
-    normalize_payment_method as normalize_catalog_payment_method,
-    validate_catalog_consistency,
-)
-from ..payment.operation import (
-    PaymentOperationConflict,
-    PaymentOperationStore,
-    conflict_result as payment_operation_conflict_result,
-)
-from ..payment.routing import (
-    PaymentRoutePlan,
-    PaymentRoutePlanner,
-    parse_proxy_pool,
-    payment_proxy_pools as canonical_payment_proxy_pools,
-)
 from ..payment import egress as payment_egress
 
 from .base import (

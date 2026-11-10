@@ -3,7 +3,7 @@
 from __future__ import annotations
 import uuid
 from typing import Any, Callable, Mapping
-from ..config import ConfigError, current_config_data, validate_config
+from ..config import ConfigError, current_config_data, validate_config  # noqa: F401 - current_config_data is a patch seam
 from ..payment.contracts import PaymentRequest
 from ..payment.executor import PaymentExecutionRequest, PaymentFlowExecutor
 from ..payment.errors import annotate_error, error_stage_of

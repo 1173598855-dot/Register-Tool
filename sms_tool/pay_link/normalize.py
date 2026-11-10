@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 import subprocess
 from typing import Any
-from ..config import current_config_data
+from ..config import current_config_data  # noqa: F401 - patch seam: tests patch this module's copy
 from ..payment.catalog import (
     PAYMENT_METHODS as CATALOG_METHODS,
     normalize_payment_method as normalize_catalog_payment_method,

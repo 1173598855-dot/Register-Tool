@@ -2,24 +2,18 @@
 
 from __future__ import annotations
 import re
-import subprocess
 from typing import Any, Mapping
-from ..config import current_config_data
+from ..config import current_config_data  # noqa: F401 - patch seam: tests patch this module's copy
 from ..payment.catalog import (
     PAYMENT_METHODS as CATALOG_METHODS,
     normalize_payment_method as normalize_catalog_payment_method,
     validate_catalog_consistency,
 )
 from ..payment.adapters import FunctionPaymentAdapter, PaymentAdapterRegistry
-from ..payment.operation import (
-    PaymentOperationConflict,
-    PaymentOperationStore,
-    conflict_result as payment_operation_conflict_result,
-)
 from ..payment.routing import (
     PaymentRoutePlan,
     PaymentRoutePlanner,
-    parse_proxy_pool,
+    parse_proxy_pool,  # noqa: F401 - re-exported: pay_link/__init__ imports it from here
     payment_proxy_pools as canonical_payment_proxy_pools,
 )
 from ..payment import egress as payment_egress
