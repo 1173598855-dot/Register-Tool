@@ -411,7 +411,9 @@ def _jwt_claims(token):
             return {}
         payload = parts[1] + "=" * (-len(parts[1]) % 4)
         return json.loads(base64.urlsafe_b64decode(payload.encode("ascii")).decode("utf-8"))
-    except Exception:
+    except (TypeError, ValueError):
+        # Not base64url JSON (binascii.Error and both decode errors derive from
+        # ValueError); a defect in the claim reader is not a malformed token.
         return {}
 
 
@@ -485,7 +487,10 @@ def _normalize_timestamp(value):
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return _format_utc(parsed.astimezone(timezone.utc))
-    except Exception:
+    except (OSError, OverflowError, TypeError, ValueError):
+        # Not a timestamp this host can represent: bad digits (ValueError), wrong
+        # type (TypeError), or an out-of-range epoch that fromtimestamp rejects
+        # with OverflowError/OSError.
         return ""
 
 
@@ -507,7 +512,9 @@ def _epoch_seconds_from_value(value):
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return int(parsed.timestamp())
-    except Exception:
+    except (OSError, OverflowError, TypeError, ValueError):
+        # Same set as the formatter above: unparseable (ValueError/TypeError) or
+        # out of range for this host (OverflowError/OSError).
         return 0
 
 
@@ -522,5 +529,5 @@ def _format_utc(value):
 def _as_int(value):
     try:
         return int(value)
-    except Exception:
+    except (TypeError, ValueError):
         return 0

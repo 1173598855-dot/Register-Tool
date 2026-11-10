@@ -171,7 +171,7 @@ def _phone_provider_rows(config: Mapping[str, Any]) -> list[dict[str, object]]:
     """
     try:
         from .phone_reuse import provider_key_status
-    except Exception:  # pragma: no cover - advisory only
+    except ImportError:  # pragma: no cover - the module this row reports on
         return []
     section = config.get("phone_reuse")
     try:
@@ -204,7 +204,7 @@ def _phone_key_collisions(config: Mapping[str, Any]) -> list[str]:
     """
     try:
         from .phone_reuse import provider_key_collisions
-    except Exception:  # pragma: no cover - advisory only
+    except ImportError:  # pragma: no cover - the module this row reports on
         return []
     section = config.get("phone_reuse")
     try:

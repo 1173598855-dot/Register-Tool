@@ -262,7 +262,7 @@ def _canonical_fingerprint_key(value: Any) -> str:
         from ..auth_headers import AUTH_FINGERPRINT_PROFILES
 
         return key if key in AUTH_FINGERPRINT_PROFILES else ""
-    except Exception:
+    except ImportError:  # pragma: no cover - the profile table is a core module
         return ""
 
 
@@ -304,7 +304,10 @@ def chatgpt_account_id_from_token(value: Any) -> str:
     try:
         decoded = base64.urlsafe_b64decode(payload.encode("ascii"))
         data = json.loads(decoded.decode("utf-8"))
-    except Exception:
+    except (TypeError, ValueError):
+        # Not base64url JSON: binascii.Error / UnicodeDecodeError /
+        # JSONDecodeError all derive from ValueError. A defect is not a
+        # malformed token.
         return ""
     if not isinstance(data, Mapping):
         return ""
