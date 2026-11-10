@@ -200,3 +200,72 @@ def test_screen_report_records_residential_samples_in_the_asn_ledger(monkeypatch
     assert recorded
     assert recorded[0]["proxy"] == "http://user:secret@good:1"
     assert recorded[0]["asn"] == "AS9299"
+
+
+# ---------------------------------------------------------------------------
+# _health_rank: the journal is advisory, a defect is not
+# ---------------------------------------------------------------------------
+
+
+class _ReversingTracker:
+    """Ranks the pool worst-first, so the mapping is not just config order."""
+
+    def __init__(self, config, **_kwargs):
+        self.config = config
+
+    def rank(self, proxies):
+        return list(reversed(proxies))
+
+
+def _raising(exc):
+    def _raiser(*args, **kwargs):
+        raise exc
+
+    return _raiser
+
+
+def test_health_rank_orders_the_pool_from_the_journal(monkeypatch):
+    monkeypatch.setattr(admin, "ProxyHealthTracker", _ReversingTracker)
+
+    rank = admin._health_rank(CONFIG)
+
+    assert sorted(rank.values()) == [0, 1], "every proxy gets a distinct position"
+
+
+def test_an_unreadable_journal_is_no_rank_information(monkeypatch):
+    """``ProxyHealthTracker`` documents (OSError, ValueError, TypeError) on its reads."""
+    monkeypatch.setattr(admin, "ProxyHealthTracker", _raising(ValueError("journal is not JSON")))
+
+    assert admin._health_rank(CONFIG) == {}
+
+
+def test_an_unknown_lane_is_no_rank_information(monkeypatch):
+    """``resolve_registration`` raises ValueError for a lane it does not know."""
+    monkeypatch.setattr(admin, "ProxyHealthTracker", _ReversingTracker)
+    monkeypatch.setattr(admin, "resolve_registration", _raising(ValueError("unknown proxy lane")))
+
+    assert admin._health_rank(CONFIG) == {}
+
+
+def test_a_rank_failure_is_no_rank_information(monkeypatch):
+    class _VanishingJournal(_ReversingTracker):
+        def rank(self, proxies):
+            raise OSError("journal vanished mid-read")
+
+    monkeypatch.setattr(admin, "ProxyHealthTracker", _VanishingJournal)
+
+    assert admin._health_rank(CONFIG) == {}
+
+
+def test_a_defect_is_not_reported_as_no_rank(monkeypatch):
+    """Lane-level decision: a bug used to be indistinguishable from a cold journal.
+
+    ``except Exception: return {}`` made an unranked list look like "the journal has
+    nothing yet", so a defect in the resolver or the tracker was invisible in
+    ``--proxy-list``.
+    """
+    monkeypatch.setattr(admin, "ProxyHealthTracker", _ReversingTracker)
+    monkeypatch.setattr(admin, "resolve_registration", _raising(RuntimeError("bug in the resolver")))
+
+    with pytest.raises(RuntimeError):
+        admin._health_rank(CONFIG)

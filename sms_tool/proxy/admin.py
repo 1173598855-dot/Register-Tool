@@ -90,11 +90,16 @@ def _health_rank(config: Mapping[str, Any] | None) -> dict[str, int]:
     try:
         tracker = ProxyHealthTracker(config or {})
         pool = _entries(resolve_registration(config or {}, lane=DEFAULT_LANE))
-    except Exception:
+    except (OSError, TypeError, ValueError):
+        # Exactly the surface this lane documents: `ProxyHealthTracker.__init__`
+        # narrows its own journal reads to (OSError, ValueError, TypeError), and
+        # `resolve_registration` raises ValueError for a lane it does not know. A
+        # defect is not "no rank information" -- see the lane-level template in
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.1.
         return {}
     try:
         ranked = tracker.rank(pool)
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return {}
     return {proxy: index for index, proxy in enumerate(ranked)}
 

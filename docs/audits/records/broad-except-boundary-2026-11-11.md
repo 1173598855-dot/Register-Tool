@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 882，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 880，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,10 +23,10 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 882 handlers (157 silent) across 184 files; whitelisted 9; budget 882/157
+broad-except: 880 handlers (157 silent) across 184 files; whitelisted 9; budget 880/157
 ```
 
-扫描得到 **35 个**候选（本轮开始时 38 个：§1 的两处结构回退 + §1.1 的一处泳道级决策已解决）。
+扫描得到 **33 个**候选（本轮开始时 38 个：§1 的两处结构回退，加上 §1.1/§1.3 的两处泳道级决策已解决；§1.2 的四处本就不在候选里）。
 
 ## 1. 本轮**已经收窄**的 2 处（写在这里，免得被当成"还没做"）
 
@@ -69,7 +69,7 @@ broad-except: 882 handlers (157 silent) across 184 files; whitelisted 9; budget 
 
 ### 1.2 第二个点位：`agent_identity` 的四处探针失败 handler
 
-同一模板的第二次应用。这四处**不在 §2 的 35 个候选里** —— 扫描的第四条把"返回带
+同一模板的第二次应用。这四处**不在 §2 的候选里** —— 扫描的第四条把"返回带
 `ok`/`error` 的 dict"当作探针失败结果排除了，那个判断仍然正确：**返回带码的失败对象是对的**。
 错的是它们**捕获了什么**。
 
@@ -101,15 +101,37 @@ broad-except: 882 handlers (157 silent) across 184 files; whitelisted 9; budget 
 `kernel.transport`（模块级会给已顶死的 `sms_tool -> sms_tool/kernel` 加边），理由写进
 `delayed_import_reasons.json`，固定分解事实 `delayed_cross_dir_edges` 308 → 310。
 
+### 1.3 第三个点位：`proxy/admin._health_rank` 的两处 handler
+
+这一次的判据来自**被调方自己的收窄**，而不是猜：`ProxyHealthTracker.__init__` 已经把日志读取
+收窄成 `(OSError, ValueError, TypeError)`，`resolve_registration` 对未知泳道抛 `ValueError`。
+所以 `_health_rank` 只需要照抄这个面。
+
+| 位置 | 前 | 后 |
+| --- | --- | --- |
+| `ProxyHealthTracker(...)` + `resolve_registration(...)` | `except Exception: return {}` | `except (OSError, TypeError, ValueError): return {}` |
+| `tracker.rank(pool)` | `except Exception: return {}` | 同上 |
+
+**为什么值得动**：`--proxy-list` 的输出里，"日志还没有数据"和"解析器有 bug"此前给出的是
+**同一个空排名**。现在前者仍然空，后者直接抛出来。
+
+**测试**：`_health_rank` 此前**零覆盖**。新增五条，替身喂窄元组：正常排序、日志不可解析
+（`ValueError`）→ `{}`、未知泳道（`ValueError`）→ `{}`、`rank` 中途日志消失（`OSError`）→ `{}`、
+解析器缺陷（`RuntimeError`）→ **向外抛**。
+
+**门禁代价**：`broad-except` 882 → **880**（silent 不变）。这一次**没有新增任何 import** ——
+`(OSError, TypeError, ValueError)` 是字面量元组，不是 `INTERNAL_EXCEPTION_TYPES` 的子集
+（有 OSError 与 ValueError 两个外部成员），所以元组归属门禁放行，耦合数一分未动。
+
 ⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
 记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
 
-## 2. 剩下 35 处：为什么必须宽着
+## 2. 剩下 33 处：为什么必须宽着
 
 > 表的"收窄要先动"一列是**测试文件**，不是"改一行代码"：这些 handler 的宽度被行为测试
 > 或注入的替身钉住，改之前得先确认那些替身喂进去的东西是否还成立。
 
-### A. try 体调用的是别处的函数（异常面不在本文件里）— 24 处
+### A. try 体调用的是别处的函数（异常面不在本文件里）— 22 处
 
 | 位置 | try 体调用的东西 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
@@ -127,9 +149,8 @@ broad-except: 882 handlers (157 silent) across 184 files; whitelisted 9; budget 
 | `payment/qualification_batch.py:333` `_dedicated_pool` | `configured_qualification_proxy_pool()` | 配置 + 池解析 | `tests/payment/test_payment_qualification.py` |
 | `payment/wire.py:312` `_checkout_sentinel_headers` | 惰性导入 + `checkout_sentinel_headers(...)` | 该调用本身发网络请求 | — |
 | `paypal/protocol.py:45` `_load_config` | 惰性导入 + `load_merged_config()` | 分片读盘 + 合并，失败类型不止 ValueError | — |
+| ~~`proxy/admin.py` `_health_rank` 两处~~ | `ProxyHealthTracker` / `resolve_registration` / `rank` | **已按 §1.3 解决**：被调方自己文档化了 `(OSError, TypeError, ValueError)`，照抄即可 | — |
 | `proxy/admin.py:74` `_cached_geo` | `shared_geo_resolver().cached` | 同 `batch_runner._cached_exit_ip` | `tests/proxy/test_proxy_admin.py` |
-| `proxy/admin.py:93` `_health_rank` | `ProxyHealthTracker(...)` + `resolve_registration(...)` | 健康日志与池解析 | `tests/accounts/test_batch_error_classification.py` |
-| `proxy/admin.py:97` `_health_rank` | `tracker.rank(pool)` | 同上，第二个 handler | 同上 |
 | `proxy/asn_registry.py:116` `_proxy_key` | 惰性导入 + `parse_proxy` + `ProxyHealthTracker.key` | 三个调用串起来，异常面跨模块 | `tests/payment/test_extractor_parity_report.py` |
 | `proxy/asn_registry.py:502` `record_registration_outcome` | `AsnRegistry.from_config(config)` | 配置读取 + 注册表构造 | `tests/proxy/test_asn_registry.py` |
 | `proxy/registry.py:212` `resolve_mailbox` | 惰性导入 + `mailbox_proxy_candidates(...)` | 自己的注释：**census 不能因部分配置失败**，且它拉 provider 适配器 | `tests/mailbox/test_mailbox_otp_dispatch_log.py`、`tests/proxy/test_proxy_registry.py` |
@@ -186,7 +207,7 @@ broad-except: 882 handlers (157 silent) across 184 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 882，含本轮五处与四处 handler）；第二半的第一个
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 880，含本轮三处泳道级点位）；第二半的第一个
 点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）
