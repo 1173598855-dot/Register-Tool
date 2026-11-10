@@ -53,6 +53,12 @@ namespace SmsWorkbench
             // a dialog-only action can never inherit the previous batch's mark.
             ActiveNavKey = string.Empty;
             pendingNavKey = key ?? string.Empty;
+            // Belt and braces for the capability gate: the row is hidden when the
+            // pack cannot serve it (MainWindow.Packs), but a keyboard shortcut or a
+            // programmatic invocation would still reach this choke point. Refusing
+            // here keeps the promise "this build does not offer that action" true
+            // even when the visual affordance is bypassed.
+            if (key != null && !packCapabilities.Allows(key)) return;
             if (key != null && NavActions.TryGetValue(key, out Action? action)) action();
         }
 

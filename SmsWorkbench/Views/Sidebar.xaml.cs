@@ -64,5 +64,49 @@ namespace SmsWorkbench
 
         private void Toggle_Click(object sender, RoutedEventArgs e)
             => RaiseEvent(new RoutedEventArgs(ToggleRequestedEvent, this));
+
+        /// <summary>
+        /// Hide the navigation rows whose action the enabled pack cannot serve.
+        /// </summary>
+        /// <remarks>
+        /// Hides rather than disables: a row that can never work in this build is
+        /// noise, and a permanently greyed row still costs a slot in a 19-row
+        /// sidebar. The decision itself lives in <see cref="PackCapabilities"/>
+        /// (pure, xunit-tested); this method only applies it to the buttons whose
+        /// <c>CommandParameter</c> is a gated nav key, and leaves every other row
+        /// alone -- an unknown key is never hidden by omission.
+        /// </remarks>
+        public void ApplyPackCapabilities(PackCapabilities capabilities)
+        {
+            ArgumentNullException.ThrowIfNull(capabilities);
+            foreach (IconNavButton button in EnumerateNavButtons(this))
+            {
+                string key = button.CommandParameter as string ?? string.Empty;
+                button.Visibility = capabilities.Allows(key) ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        /// <summary>
+        /// Every <see cref="IconNavButton"/> under <paramref name="root"/>, by visual
+        /// tree. The rows are static XAML (not an ItemsControl), so there is no
+        /// collection to rebind -- the tree is the only enumeration point.
+        /// </summary>
+        private static IEnumerable<IconNavButton> EnumerateNavButtons(DependencyObject root)
+        {
+            int count = VisualTreeHelper.GetChildrenCount(root);
+            for (int index = 0; index < count; index++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(root, index);
+                if (child is IconNavButton button)
+                {
+                    yield return button;
+                }
+
+                foreach (IconNavButton nested in EnumerateNavButtons(child))
+                {
+                    yield return nested;
+                }
+            }
+        }
     }
 }

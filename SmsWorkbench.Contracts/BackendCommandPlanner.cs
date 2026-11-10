@@ -826,6 +826,22 @@ namespace SmsWorkbench
             args.Add(value);
         }
 
+        /// <summary>
+        /// The read-only inventory of installed packs, as JSON.
+        /// </summary>
+        /// <remarks>
+        /// The window needs one thing from it -- which capabilities the single
+        /// enabled pack declares -- so that it can stop offering actions the backend
+        /// has no entrypoint for (see <see cref="PackCapabilities"/>). It is a plan
+        /// rather than a literal argument list for the same reason every other
+        /// backend call is: the flags live in this file, not in the views.
+        /// </remarks>
+        public static BackendCommandPlan CreatePackList()
+        {
+            var args = new List<string> { "--pack-list", "--json" };
+            return new BackendCommandPlan("pack-list", args);
+        }
+
         private static void AppendRegistrationAtOnly(List<string> args)
         {
             args.Add("--registration-at-only");

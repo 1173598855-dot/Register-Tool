@@ -33,7 +33,8 @@
              drawn once, here: window chrome and the title bar are the only places
              besides inputs and the focus ring that keep a stroke. -->
         <Grid Grid.Column="0">
-          <local:Sidebar IsCollapsed="{Binding SidebarCollapsed}"
+          <local:Sidebar x:Name="SidebarControl"
+                         IsCollapsed="{Binding SidebarCollapsed}"
                          ActiveKey="{Binding ActiveNavKey, RelativeSource={RelativeSource AncestorType=Window}}"
                          ToggleRequested="OnSidebarToggleRequested"/>
           <Border Width="1" HorizontalAlignment="Right" Background="{DynamicResource Divider}"/>

@@ -384,3 +384,39 @@ Wpf.Ui.xaml -> Wpf.Ui Theme/Light.xaml -> Themes/Tokens.xaml -> Themes/Glyphs.xa
 ratchet 用 AST 计数、**不读任何注释**；所以注释买不到额度，删注释也降不下计数。
 
 和 `dotnet_warning_ratchet.py` / `pyright_ratchet.py` 同一套思路：先冻结、再加预算、最后逐条白名单化。
+
+## 9. 侧栏按 pack 能力渲染（Phase 5.1，2026-11-11）
+
+一套注册架构 = 一个 pack，manifest 声明它**声称**能做哪些能力
+（`sms_tool/packs/contracts.py` 拥有这份词表）。在此之前桌面无条件渲染全部 19 行 ——
+那在"只有一个 pack 且它什么都声明"时是正确的，但第二套架构一旦落地而不声明
+`payment.link`，它的支付行就会打开一个后端根本没有入口的命令。
+
+**数据来源是一个已有的只读命令**：`python -m sms_tool --pack-list --json`。桌面在
+`OnContentRendered` 里跑它一次（`MainWindow.Packs.cs`），把答案投影成能力集合。
+
+| 层 | 谁做什么 |
+| --- | --- |
+| `SmsWorkbench.Contracts/PackCapabilities.cs` | 纯投影：读 `packs[].id` / `enabled` / `capabilities`，回答 `Allows(navKey)`。**无 WPF 依赖**，xunit 直测（8 例） |
+| `BackendCommandPlanner.CreatePackList()` | 唯一拼 `--pack-list --json` 的地方 —— 和后端旗标词汇的其他部分一样，旗标不写进视图 |
+| `Sidebar.ApplyPackCapabilities(...)` | 走视觉树把 `IconNavButton` 的 `CommandParameter` 过一遍门禁，未声明就 `Collapsed` |
+| `MainWindow.OnNavigate` | 兜底：行虽然藏了，键盘快捷键或程序化调用仍会到这里，未声明就直接返回 |
+
+**被门禁的只有 6 行 / 3 个能力**：`paylink` / `batchpay` / `paymentqualification` →
+`payment.link`；`sms` / `inbox` → `mailbox.otp`；`scan` → `account.health`。
+`settings` / `theme` / `language` / `proxypool` / `backup` / `restore` / `register`
+**永不门禁** —— 操作者必须能在应用内修好一个装坏的包。
+
+三条刻意的失败方向：
+
+1. **读不到就不门禁**。没有 payload、payload 不是对象、没有 `packs` 数组 —— 一律
+   `AllowAll`。能力探测是 UI 便利，不是权限；它失败不能把操作者自己的工具拿走。
+2. **歧义不猜**。多于一个 enabled pack 时也 `AllowAll`，并把原因写进 `Source`。后端自己
+   在这种情形下是 exit 2 并点名 `--pack` / `GPT_PACK_ID` 两种解法；桌面按顺序取第一个
+   就等于替人做了没人做过的路由决策。
+3. **禁用包不参与塑形**。`enabled: false` 的 pack 不能影响 UI —— 它连命令都服务不了。
+
+对应的后端契约钉在 `tests/packs/test_pack_capability_payload.py`：那份 payload 的三个字段
+必须存在，且桌面硬编码的三个能力名必须在 `CAPABILITY_VOCABULARY` 里 —— 否则改名后门禁会
+拿一个没有 manifest 能声明的字符串去比较，结果是**每一行都被藏起来**，而那种故障看起来
+就像一个产品决定。

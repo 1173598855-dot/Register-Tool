@@ -787,4 +787,17 @@ public sealed class BackendCommandPlannerTests
 
         Assert.Empty(args);
     }
+
+    /// <summary>
+    /// The capability probe the desktop renders from: one plan, so the flags stay in
+    /// this file rather than in a view.
+    /// </summary>
+    [Fact]
+    public void CreatePackList_AsksForTheJsonInventory()
+    {
+        var plan = BackendCommandPlanner.CreatePackList();
+
+        Assert.Equal(new[] { "--pack-list", "--json" }, plan.Arguments);
+        Assert.False(string.IsNullOrWhiteSpace(plan.TaskName));
+    }
 }

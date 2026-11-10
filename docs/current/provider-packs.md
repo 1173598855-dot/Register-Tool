@@ -87,6 +87,14 @@ manifest 读出。它**逐条报告**而不是抛异常：半坏的 pack 正是�
 
 退出码沿用仓库约定：`0` 正常，`2` 前置/校验失败。
 
+**`--pack-list --json` 有一个生产消费方**：WPF 桌面用它决定渲染哪些动作
+（`SmsWorkbench.Contracts/PackCapabilities.cs`，见 `ui-architecture.md` §9）。它读的是
+`packs[].id` / `enabled` / `capabilities` 三个字段，所以这三个字段是**契约**，由
+`tests/packs/test_pack_capability_payload.py` 从生产侧钉住；能力名（`payment.link` /
+`mailbox.otp` / `account.health`）还必须留在 `contracts.py` 的词表里，否则桌面的门禁会拿
+一个没有 manifest 能声明的字符串去比较 —— 结果是每一行都被藏起来，而那种故障看起来
+像一个产品决定。
+
 ## 新增一套注册架构
 
 ```powershell
