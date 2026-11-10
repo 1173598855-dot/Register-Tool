@@ -13,6 +13,15 @@ import argparse
 
 def register(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
+        "--pack",
+        default=None,
+        metavar="PACK_ID",
+        help=(
+            "Provider pack (registration architecture) to run a capability on, when more than one "
+            "installed pack claims it. Overrides GPT_PACK_ID"
+        ),
+    )
+    parser.add_argument(
         "--pack-list",
         action="store_true",
         help="List installed provider packs (registration architectures) and their capabilities, then exit",

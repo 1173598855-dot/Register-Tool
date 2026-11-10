@@ -1205,29 +1205,36 @@ def _check_payment_qualification(args):
 
 
 def _refresh_cpa_quota(args):
-    return account_commands.refresh_cpa_quota(args, _account_command_context())
+    probe_fn = _account_health_probe_or_exit(args, "--refresh-local-quota")
+    return account_commands.refresh_cpa_quota(args, _account_command_context(), probe_fn=probe_fn)
 
 
-def _account_health_probe():
+def _account_health_probe(pack_id=None):
     """Resolve the ``account.health`` probe from the pack that claims it.
 
-    This is the first capability actually *dispatched* rather than imported: the
-    manifest decides which function runs, and a broken or disabled pack fails
-    here with a named reason instead of silently importing the old symbol.
+    This is the capability actually *dispatched* rather than imported: the
+    manifest decides which function runs, and a broken, disabled or ambiguous set
+    of packs fails here with a named reason instead of silently importing the old
+    symbol.
     """
-    return pack_dispatch.resolve_capability_entrypoint("account.health", "account_liveness")
+    return pack_dispatch.resolve_capability_entrypoint("account.health", "account_liveness", pack_id=pack_id)
+
+
+def _account_health_probe_or_exit(args, command: str):
+    """Best-effort wrapper: a dispatch failure is a preflight failure, not a traceback.
+
+    The desktop host renders exit codes rather than stacks, so everything that
+    resolves a capability reports the same way `--doctor` does.
+    """
+    try:
+        return _account_health_probe(getattr(args, "pack", None))
+    except (pack_dispatch.CapabilityDispatchError, PackManifestError) as exc:
+        safe_print(f"{command}: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None
 
 
 def _quota_usage(args):
-    try:
-        probe_fn = _account_health_probe()
-    except (pack_dispatch.CapabilityDispatchError, PackManifestError) as exc:
-        # A discovered-but-broken pack must read as a preflight failure, not a
-        # traceback: `--quota-usage` is reachable from the desktop host, which
-        # renders an exit code rather than a stack.
-        safe_print(f"--quota-usage: {exc}", file=sys.stderr)
-        raise SystemExit(2) from None
-    return account_commands.quota_usage(args, probe_fn=probe_fn)
+    return account_commands.quota_usage(args, probe_fn=_account_health_probe_or_exit(args, "--quota-usage"))
 
 
 def _payment_link_command_context():
@@ -1320,7 +1327,8 @@ def _one_click_sms(args):
 
 
 def _one_click_scan(args):
-    return one_click_commands.one_click_scan(args)
+    probe_fn = _account_health_probe_or_exit(args, "--one-click-scan")
+    return one_click_commands.one_click_scan(args, probe_fn=probe_fn)
 
 
 def _persist_one_click_sms_failure(data, json_path, email, result):

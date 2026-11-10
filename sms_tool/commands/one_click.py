@@ -350,7 +350,7 @@ def one_click_sms(args: Any, ctx: OneClickCommandContext) -> None:
         raise SystemExit(3)
 
 
-def one_click_scan(args: Any) -> None:
+def one_click_scan(args: Any, *, probe_fn: Any = None) -> None:
     """Batch OAuth probe accounts without sending SMS."""
     from ..accounts.account_scan import scan_accounts
     from ..session_refresh import _load_seed_session
@@ -383,6 +383,7 @@ def one_click_scan(args: Any) -> None:
         quota_relogin_on_401=bool(args.quota_auto_relogin),
         relogin_mode=args.scan_relogin_mode,
         deep_probe=bool(getattr(args, "scan_deep_probe", False)),
+        probe_fn=probe_fn,
     )
     if summary.get("failed", 0) or summary.get("persist_failed", 0):
         raise SystemExit(3)

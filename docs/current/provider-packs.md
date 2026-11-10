@@ -78,6 +78,7 @@ python -m sms_tool --pack-info openai.chatgpt     # 单个 pack 的 manifest/命
 python -m sms_tool --pack-verify openai.chatgpt   # 解析每个入口与钩子
 python -m sms_tool --pack-verify                  # 全部 pack
 python -m sms_tool --pack-list --json             # 机器可读（也可 --desktop-ipc）
+python -m sms_tool --pack acme.portal --quota-usage   # 指定由哪套架构跑这个能力
 ```
 
 `--pack-verify` 是唯一会真正 import 的操作，因为"这个入口到底存不存在"无法从
@@ -127,7 +128,7 @@ python -m pytest -q tests/packs
 | --- | --- | --- |
 | P0（已完成） | 冻基线：全量 pytest / dotnet / 结构闸绿 | 无 |
 | P1（已完成） | manifest 契约 + 注册表 + 发现 + 运维面 + 脚手架 + 边界棘轮 | 无（ChatGPT 仍走原调用链） |
-| P2（首个能力已接通） | `account.health` 从 `--quota-usage` 起走 `dispatch.resolve_capability_entrypoint`，带对象同一性与注入测试 | 单能力，等价性有测试 |
+| P2（已接通 3 个消费点 + 选择器） | `account.health` 经 `dispatch` 注入到 `--quota-usage` / `--refresh-local-quota` / `--one-click-scan`；`--pack` + `GPT_PACK_ID` 解决多架构歧义 | 单能力，等价性有测试 |
 | P3 | 把 `registration/` 的阶段体迁入 `platforms/chatgpt/`，manifest 改指向新位置 | 结构，行为不变 |
 | P4 | 第二套架构落地，验证抽象（第一个 pack 不能证明通用性） | 新增架构 |
 | P5 | 桌面端按 `capabilities` 渲染页面；CLI 加 `--provider <pack_id>` | UI/入口 |
@@ -151,13 +152,34 @@ python -m pytest -q tests/packs
 **没有"找不到就回退到老函数"这条路径。** 静默回退会让坏 pack 与好 pack 无法区分，
 这正是注册泳道在宽泛 `except` 上付过的代价。
 
+### 多套架构声明同一能力时怎么选
+
+选择顺序是固定的，且**只有一种明确来源**才会生效：
+
+| 优先级 | 来源 | 说明 |
+| --- | --- | --- |
+| 1 | `--pack <PACK_ID>` | 命令行显式指定 |
+| 2 | 环境变量 `GPT_PACK_ID` | 进程级默认；桌面宿主可像 `GPT_REGISTER_CONFIG_DIR` 一样下发给后端 |
+| 3 | 唯一声明者 | 只有一套架构声明该能力时不需选择器 |
+| 4 | 报错 | 多套声明且前两级都没给 ⇒ 报错并列出声明者 |
+
+**永远不按 id 顺序取第一个**——那是没人做过的路由决策。默认值放在环境变量而不是
+配置分片，是因为它选的是"这个进程跑哪套实现"，与 `GPT_REGISTER_CONFIG_DIR` /
+`GPT_PACK_PATH` 同类；放进配置分片会连带牵动分片归属清单、C# `ConfigStore` 对等
+检查和 config-key 棘轮。
+
 ### 已接通的能力
 
 | 能力 | 入口 | 消费点 | 保证 |
 | --- | --- | --- | --- |
-| `account.health` | `account_liveness` | `--quota-usage`（`cli._quota_usage` 解析后注入 `commands/accounts.py::quota_usage(probe_fn=…)`） | `tests/packs/test_capability_dispatch.py`：解析出的对象**就是**工作流原本直接 import 的那个函数（对象同一性），另有注入测试与"CLI 真的走了 registry"的接线测试 |
+| `account.health` | `account_liveness` | `--quota-usage`（单账号） | `tests/packs/test_capability_dispatch.py`：解析出的对象**就是**工作流原本直接 import 的那个函数（对象同一性） |
+| `account.health` | `account_liveness` | `--refresh-local-quota` / `--quota-mode local`（批量，经 `_probe_liveness_with_retries`） | 注入测试：`probe_fn` 真的到达重试助手 |
+| `account.health` | `account_liveness` | `--one-click-scan`（批量扫描） | 注入测试：每个账号的 `_scan_one` 都拿到注入的 callable |
 
-`quota_usage` 的 `probe_fn` 默认仍是直接 import，所以既有调用方与既有测试一个都不变。
+三个消费点的 `probe_fn` 默认仍是直接 import，所以既有调用方与既有测试一个都不变。
+注入走显式关键字：**没有新增任何跨目录 import 边**（`import-layer` 仍是 473 边 /
+78 对，`delayed` 仍是 473/362），这是刻意的——批处理所在的
+`sms_tool/accounts -> sms_tool` 预算已顶死 36 条，用 `importlib` 绕静态图属于骗门禁。
 
 ### 这条路上的一处结构约束（需要决策）
 
@@ -170,6 +192,27 @@ python -m pytest -q tests/packs
 要么把 `packs` 提升为独立目录节点并接受新的一对边（`ordered_pairs` 78 → 79），
 要么继续走"命令层解析 + 注入"。两者都不是零成本，所以留给显式评审，而不是
 偷偷用 `importlib` 绕开静态图。
+
+## 每套架构的 A/B 开关往哪记
+
+`scripts/experiment_ledger.json` 的扁平 `toggles` 是注册泳道的 `registration.*` 开关，
+第二套架构的开关不是 `registration.*` 键，塞进同一张表就等于假装一个平台的实验是另一
+个平台的。所以台账有第二个区：
+
+```text
+packs.<pack_id>.toggles.<key> = {kind, default, status, doc, [id], [verdict], [expires]}
+```
+
+`scripts/experiment_ratchet.py` 对这一段能证明两件事，并明确声明它**证明不了**第三件：
+
+| 检查 | 结果 |
+| --- | --- |
+| pack id 必须是随仓库发布的 pack | 已退役架构的条目会失败，而不是留着没人管 |
+| 决策必须完整（kind/status/default、ab 的 hypothesis id、concluded 的 verdict、open 的到期日、`doc` 必须存在） | 失败即红 |
+| 同一个 hypothesis id 不得被两套架构共用 | 失败即红（与注册泳道共享同一张 id 表） |
+| **代码确实读了这个开关** | **证明不了**：目前没有 pack 作用域的 flag reader。因此 `retired` 在这里被直接拒绝——没人读的键没有什么可"退役"的，记一个不可验证的状态比不记更糟 |
+
+等某套架构真的落地一个 reader，这条检查就补上注册泳道已有的 code↔ledger 双向校验。
 
 ## 刻意不做的事
 

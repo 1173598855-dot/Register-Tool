@@ -88,6 +88,7 @@ def scan_accounts(
     quota_relogin_on_401: bool = False,
     relogin_mode: str = "auto",
     deep_probe: bool = False,
+    probe_fn: Any = None,
 ) -> dict[str, Any]:
     emails = _unique_emails(emails)
     workers = max(1, min(int(workers or 1), 8, len(emails) or 1))
@@ -110,6 +111,7 @@ def scan_accounts(
                 quota_relogin_on_401=quota_relogin_on_401,
                 relogin_mode=relogin_mode,
                 deep_probe=deep_probe,
+                probe_fn=probe_fn,
             )
     else:
         with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -129,6 +131,7 @@ def scan_accounts(
                     quota_relogin_on_401=quota_relogin_on_401,
                     relogin_mode=relogin_mode,
                     deep_probe=deep_probe,
+                    probe_fn=probe_fn,
                 )
                 for index, email in enumerate(emails)
             ]
@@ -209,6 +212,7 @@ def _scan_one(
     quota_relogin_on_401: bool = False,
     relogin_mode: str = "auto",
     deep_probe: bool = False,
+    probe_fn: Any = None,
 ) -> dict[str, Any]:
     print(f"\n[{index + 1}/{total}] Account scan: {email}")
     started = time.time()
@@ -231,7 +235,7 @@ def _scan_one(
         print(f"[DEACTIVATED] {email}; terminal account skipped")
         return result
 
-    token_probe = _probe_existing_access_token(data, proxy=proxy, timeout=timeout)
+    token_probe = _probe_existing_access_token(data, proxy=proxy, timeout=timeout, probe_fn=probe_fn)
     _raw_auth_session: object = data.get("auth_session")
     auth_session: dict = _raw_auth_session if isinstance(_raw_auth_session, dict) else {}
     refresh_token = _openai_refresh_token(data, auth_session)
@@ -413,9 +417,8 @@ def _scan_one(
         print(f"[{label}] {email}")
         return result
 
-    # If the account still has a usable AT (either from RT refresh or from the
-    # existing local AT probe), do not downgrade it to a failed scan merely
-    # because the deeper auth/add-phone probe could not finish.
+    # A usable AT (from RT refresh or from the local AT probe) must not be
+    # downgraded to a failed scan just because the deeper auth/add-phone probe did not finish.
     if refresh_result.get("ok") or _token_probe_is_active(token_probe):
         result = _result(
             index,
@@ -901,11 +904,12 @@ def _looks_account_deactivated(result):
     return text_has_account_deactivated(json.dumps(_public_oauth_result(result), ensure_ascii=False))
 
 
-def _probe_existing_access_token(data, proxy=None, timeout=120):
+def _probe_existing_access_token(data, proxy=None, timeout=120, probe_fn=None):
     if not str((data or {}).get("access_token") or "").strip():
         return {}
+    probe = probe_fn or probe_account_liveness
     try:
-        return probe_account_liveness(
+        return probe(
             data,
             proxy=proxy,
             timeout=min(max(int(timeout or 30), 5), 45),

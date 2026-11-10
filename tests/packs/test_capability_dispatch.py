@@ -107,7 +107,7 @@ def test_two_claimants_require_an_explicit_pack_id() -> None:
     """Picking by id order would be a routing decision nobody made."""
     registry = registry_of(manifest("a.first"), manifest("b.second"))
 
-    with pytest.raises(dispatch.CapabilityDispatchError, match="pass pack_id to choose one explicitly"):
+    with pytest.raises(dispatch.CapabilityDispatchError, match="pass --pack"):
         dispatch.resolve_capability_entrypoint(CAPABILITY, ENTRYPOINT, registry=registry)
 
     resolved = dispatch.resolve_capability_entrypoint(CAPABILITY, ENTRYPOINT, pack_id="b.second", registry=registry)
@@ -119,6 +119,66 @@ def test_an_explicit_pack_id_that_does_not_claim_is_rejected() -> None:
 
     with pytest.raises(dispatch.CapabilityDispatchError, match="does not claim"):
         dispatch.resolve_capability_entrypoint(CAPABILITY, ENTRYPOINT, pack_id="c.third", registry=registry)
+
+
+# ---------------------------------------------------------------------------
+# The selector: flag, then process default, then the only claimant
+# ---------------------------------------------------------------------------
+
+
+def test_the_process_default_selects_among_claimants() -> None:
+    registry = registry_of(manifest("a.first"), manifest("b.second"))
+
+    resolved = dispatch.resolve_capability_entrypoint(
+        CAPABILITY, ENTRYPOINT, registry=registry, environ={"GPT_PACK_ID": "b.second"}
+    )
+
+    assert resolved.__name__ == "probe_account_liveness"
+
+
+def test_an_explicit_flag_beats_the_process_default() -> None:
+    registry = registry_of(manifest("a.first"), manifest("b.second"))
+
+    owner = dispatch.capability_owner(
+        CAPABILITY, pack_id="a.first", registry=registry, environ={"GPT_PACK_ID": "b.second"}
+    )
+
+    assert owner == "a.first"
+
+
+def test_the_process_default_must_claim_the_capability() -> None:
+    registry = registry_of(manifest("a.first"), manifest("b.second"))
+
+    with pytest.raises(dispatch.CapabilityDispatchError, match="does not claim"):
+        dispatch.resolve_capability_entrypoint(
+            CAPABILITY, ENTRYPOINT, registry=registry, environ={"GPT_PACK_ID": "c.third"}
+        )
+
+
+def test_a_blank_process_default_is_treated_as_unset() -> None:
+    registry = registry_of(manifest("a.first"), manifest("b.second"))
+
+    with pytest.raises(dispatch.CapabilityDispatchError, match="2 packs claim"):
+        dispatch.resolve_capability_entrypoint(CAPABILITY, ENTRYPOINT, registry=registry, environ={"GPT_PACK_ID": "  "})
+
+
+def test_the_ambiguity_message_names_both_remedies() -> None:
+    registry = registry_of(manifest("a.first"), manifest("b.second"))
+
+    with pytest.raises(dispatch.CapabilityDispatchError) as excinfo:
+        dispatch.resolve_capability_entrypoint(CAPABILITY, ENTRYPOINT, registry=registry, environ={})
+
+    message = str(excinfo.value)
+    assert "--pack" in message
+    assert "GPT_PACK_ID" in message
+
+
+def test_a_single_claimant_needs_no_selector() -> None:
+    registry = registry_of(manifest("only.one"))
+
+    resolved = dispatch.resolve_capability_entrypoint(CAPABILITY, ENTRYPOINT, registry=registry, environ={})
+
+    assert resolved.__name__ == "probe_account_liveness"
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +234,7 @@ def test_the_cli_routes_quota_usage_through_the_registry(
     marker = object()
     forwarded: dict[str, Any] = {}
 
-    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", lambda capability, entrypoint: marker)
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", lambda capability, entrypoint, **kwargs: marker)
     monkeypatch.setattr(
         account_commands,
         "quota_usage",
@@ -187,7 +247,7 @@ def test_the_cli_routes_quota_usage_through_the_registry(
 
 
 def test_the_cli_reports_a_missing_capability_instead_of_crashing(monkeypatch: pytest.MonkeyPatch) -> None:
-    def unavailable(capability: str, entrypoint: str) -> Any:
+    def unavailable(capability: str, entrypoint: str, **kwargs: Any) -> Any:
         raise dispatch.CapabilityDispatchError("no enabled provider pack claims 'account.health'")
 
     monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", unavailable)
@@ -202,7 +262,7 @@ def test_the_cli_reports_a_broken_external_pack_instead_of_crashing(monkeypatch:
     """A discovered-but-unreadable manifest is a preflight failure, not a traceback."""
     from sms_tool.packs.contracts import PackManifestError
 
-    def broken(capability: str, entrypoint: str) -> Any:
+    def broken(capability: str, entrypoint: str, **kwargs: Any) -> Any:
         raise PackManifestError("cannot read provider manifest manifest.json: unexpected token")
 
     monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", broken)
@@ -211,3 +271,62 @@ def test_the_cli_reports_a_broken_external_pack_instead_of_crashing(monkeypatch:
         cli._quota_usage(quota_args())
 
     assert excinfo.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# The selector reaches the CLI and the two batch workflows
+# ---------------------------------------------------------------------------
+
+
+def test_the_cli_forwards_the_selected_pack_to_dispatch(
+    quota_env: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = object()
+    seen: dict[str, Any] = {}
+
+    def resolve(capability: str, entrypoint: str, **kwargs: Any) -> Any:
+        seen.update(kwargs)
+        return marker
+
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", resolve)
+    monkeypatch.setattr(account_commands, "quota_usage", lambda args, *, probe_fn=None: seen.update(probe=probe_fn))
+
+    cli._quota_usage(quota_args(pack="acme.portal"))
+
+    assert seen["pack_id"] == "acme.portal"
+    assert seen["probe"] is marker
+
+
+def test_scan_accounts_threads_the_probe_into_every_account(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sms_tool.accounts import account_scan
+
+    marker = object()
+    seen: list[Any] = []
+
+    def fake_scan_one(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        seen.append(kwargs.get("probe_fn"))
+        return {"index": kwargs.get("index", args[0] if args else 0), "ok": True, "scan_status": "ok"}
+
+    monkeypatch.setattr(account_scan, "_scan_one_with_lane", fake_scan_one)
+
+    account_scan.scan_accounts(["a@example.com"], workers=1, probe_fn=marker)
+
+    assert seen == [marker]
+
+
+def test_refresh_local_quota_statuses_threads_the_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sms_tool.accounts import recovery_batch
+
+    marker = object()
+    seen: list[Any] = []
+
+    def fake_with_retries(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        seen.append(kwargs.get("probe_fn"))
+        return {"ok": True, "status": "active", "quota_status": "可用", "status_code": 200}
+
+    monkeypatch.setattr(recovery_batch, "_probe_liveness_with_retries", fake_with_retries)
+
+    recovery_batch.refresh_local_quota_statuses(emails=["a@example.com"], workers=1, probe_fn=marker)
+
+    # The injected callable is what reaches the retry helper, not the import.
+    assert seen and seen[0] is marker

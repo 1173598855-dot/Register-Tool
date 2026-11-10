@@ -100,6 +100,7 @@ def refresh_local_quota_statuses(
     batch_timeout: int = 900,
     account_timeout: int = 360,
     fresh_probes: dict[str, dict[str, Any]] | None = None,
+    probe_fn: Any = None,
 ) -> dict[str, Any]:
     # 策略层与既有助手在调用期经 account_recovery 解析：测试对
     # account_recovery.* 的 patch 才能生效（切分不改变 patch 面）。
@@ -130,6 +131,7 @@ def refresh_local_quota_statuses(
         runtime_file,
     )
 
+    default_probe = probe_fn or probe_account_liveness
     if relogin_on_401:
         _refresh_mailbox_quarantine_state()
     accounts = _local_quota_accounts(emails)
@@ -235,11 +237,9 @@ def refresh_local_quota_statuses(
                     "terminal": True,
                 }
             else:
-                # A scan pass that just ran probe_account_liveness for this
-                # account hands its verdict in via ``fresh_probes``; re-probing
-                # wham minutes later doubled the Cloudflare-401 exposure and
-                # let the two passes disagree. Reuse only definitive
-                # classifications -- transport-unknown results still re-probe.
+                # A scan pass that just ran probe_account_liveness hands its
+                # verdict in via ``fresh_probes``; re-probing wham minutes later
+                # doubled the Cloudflare-401 exposure. Unknown still re-probes.
                 fresh = (fresh_probes or {}).get(str(email).strip().lower())
                 if _probe_is_fresh_definitive(fresh):
                     probe = {**fresh, "probe_source": "scan_reuse"}
@@ -248,7 +248,7 @@ def refresh_local_quota_statuses(
                     # every account, including accounts that have a browser
                     # identity. This avoids opening a browser for healthy tokens.
                     probe = _probe_liveness_with_retries(
-                        account, proxy=proxy, timeout=probe_timeout, browser_fetch=None
+                        account, proxy=proxy, timeout=probe_timeout, browser_fetch=None, probe_fn=default_probe
                     )
                 if not isinstance(probe, dict):
                     probe = {
@@ -272,7 +272,7 @@ def refresh_local_quota_statuses(
                                 account, proxy=proxy, timeout=probe_timeout
                             ) as browser_fetch:
                                 if browser_fetch is not None:
-                                    browser_probe = probe_account_liveness(
+                                    browser_probe = default_probe(
                                         account,
                                         proxy=proxy,
                                         timeout=probe_timeout,
@@ -524,6 +524,7 @@ def _probe_liveness_with_retries(
     proxy: str | None,
     timeout: int,
     browser_fetch: Any = None,
+    probe_fn: Any = None,
 ) -> dict[str, Any]:
     """Retry transport-only failures against the configured liveness pool."""
     from .account_recovery import (
@@ -533,6 +534,7 @@ def _probe_liveness_with_retries(
         proxy_pool_for,
     )
 
+    probe = probe_fn or probe_account_liveness
     has_affinity = bool((account.get("identity_context") or {}).get("proxy_affinity"))
     configured = proxy_pool_for(CFG, "liveness")
     # An explicit command proxy is authoritative.  Do not silently replace it
@@ -549,7 +551,7 @@ def _probe_liveness_with_retries(
     last: dict[str, Any] = {}
     for candidate in candidates:
         effective_proxy = candidate
-        last = probe_account_liveness(account, proxy=effective_proxy, timeout=timeout, browser_fetch=browser_fetch)
+        last = probe(account, proxy=effective_proxy, timeout=timeout, browser_fetch=browser_fetch)
         if isinstance(last, dict):
             last.setdefault("proxy_source", source)
         if int(last.get("status_code") or 0) != 0 or last.get("ok"):

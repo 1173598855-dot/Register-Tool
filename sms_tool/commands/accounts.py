@@ -254,7 +254,14 @@ def check_promotion(args: Any, ctx: AccountCommandContext) -> None:
         raise SystemExit(3)
 
 
-def refresh_cpa_quota(args: Any, ctx: AccountCommandContext) -> None:
+def refresh_cpa_quota(args: Any, ctx: AccountCommandContext, *, probe_fn: Any = None) -> None:
+    """Refresh quota statuses for a batch.
+
+    ``probe_fn`` is the injected ``account.health`` capability, resolved by the
+    CLI from the provider pack that claims it (``--pack`` / ``GPT_PACK_ID``). It
+    defaults to the direct import inside the workflow, so every existing caller
+    and test is unchanged.
+    """
     from ..accounts.recovery_batch import refresh_local_quota_statuses
     from ..cpa_import import refresh_cpa_quota_statuses
 
@@ -300,6 +307,7 @@ def refresh_cpa_quota(args: Any, ctx: AccountCommandContext) -> None:
             relogin_mode=str(getattr(args, "scan_relogin_mode", "auto") or "auto"),
             batch_timeout=budgets["batch_timeout"],
             account_timeout=budgets["account_timeout"],
+            probe_fn=probe_fn,
         )
         fallback_emails = [
             item.get("email")
