@@ -1,0 +1,224 @@
+{
+  "schema": "entry_points.v1",
+  "_why": "Every way into this repository is declared here once: what it is, who owns it, whether it is the authoritative surface, and where its code lives. scripts/entry_point_ratchet.py fails when a repository-root Python file, a services/ project, a SmsWorkbench project or a packaged artifact appears without a row, and when a row names something that no longer exists. That is the gate that stops entry points from accumulating at the root one convenience script at a time.",
+  "_rules": [
+    "kind is one of kinds; status is one of statuses.",
+    "Every root-level *.py file is claimed by exactly one entry via roots.",
+    "Every services/<dir>/ and every SmsWorkbench* project directory is claimed.",
+    "Every declared root must exist (a row for deleted code fails).",
+    "Packaged artifacts (*.exe/*.msi/*.zip/*.7z) may not sit at the repository root; releases are built into dist/.",
+    "A new entry needs a row here AND a heading in docs/current/entry-points.md before it can land."
+  ],
+  "kinds": [
+    "cli",
+    "compat",
+    "desktop",
+    "operator",
+    "service",
+    "tool"
+  ],
+  "statuses": [
+    "authoritative",
+    "compat",
+    "internal",
+    "deprecated"
+  ],
+  "entries": [
+    {
+      "id": "cli",
+      "kind": "cli",
+      "status": "authoritative",
+      "owner": "sms_tool/cli.py",
+      "purpose": "The only supported command surface: argparse entry, lazy command dispatch and the early exits (--doctor, --desktop-serve, --pack-*).",
+      "roots": [
+        "sms_tool/__main__.py",
+        "sms_tool/cli.py"
+      ]
+    },
+    {
+      "id": "desktop",
+      "kind": "desktop",
+      "status": "authoritative",
+      "owner": "SmsWorkbench/App.xaml.cs",
+      "purpose": "The WPF shell. It plans commands and starts the Python backend; it owns no provider or protocol behaviour.",
+      "roots": [
+        "SmsWorkbench/",
+        "SmsWorkbench.Contracts/"
+      ]
+    },
+    {
+      "id": "compat-script",
+      "kind": "compat",
+      "status": "compat",
+      "owner": "chatgpt_phone_reg.py",
+      "purpose": "Historical entry name kept so old shortcuts and documentation keep working. Delegates to sms_tool.cli; add nothing here.",
+      "roots": [
+        "chatgpt_phone_reg.py"
+      ]
+    },
+    {
+      "id": "proxy-pool",
+      "kind": "operator",
+      "status": "internal",
+      "owner": "start_proxy_pool.py",
+      "purpose": "Standalone SOCKS5 listener that rotates over SOCKS5/HTTP-CONNECT upstreams, for local proxy-pool experiments.",
+      "roots": [
+        "start_proxy_pool.py"
+      ]
+    },
+    {
+      "id": "verify-proxy",
+      "kind": "operator",
+      "status": "internal",
+      "owner": "verify_proxy.py",
+      "purpose": "Read-only proxy reachability check, optionally against the ChatGPT login edge (clean/blocked/degraded/dead).",
+      "roots": [
+        "verify_proxy.py"
+      ]
+    },
+    {
+      "id": "mail-otp-web",
+      "kind": "service",
+      "status": "internal",
+      "owner": "services/mail-otp-web/app.py",
+      "purpose": "Optional local mailbox/OTP helper service. Exposes an HTTP boundary and must not write the account store.",
+      "roots": [
+        "services/mail-otp-web/"
+      ]
+    },
+    {
+      "id": "protocol-payment",
+      "kind": "service",
+      "status": "internal",
+      "owner": "services/protocol-payment/",
+      "purpose": "The protocol-payment extractors, one directory per payment method. A separate process on purpose: Boundary Rule 10 forbids importing sms_tool from here.",
+      "roots": [
+        "services/protocol-payment/"
+      ]
+    },
+    {
+      "id": "operator-scripts",
+      "kind": "tool",
+      "status": "internal",
+      "owner": "scripts/",
+      "purpose": "Gates, ratchets, scaffolds and one-off operator helpers, invoked by filename from CI, the git hooks and tests. New tooling goes here, never at the repository root.",
+      "roots": [
+        "scripts/"
+      ]
+    },
+    {
+      "id": "build",
+      "kind": "tool",
+      "status": "internal",
+      "owner": "SmsWorkbench/build_dotnet.ps1",
+      "purpose": "The only supported build path for the desktop artifact and the installer (dist/ and dist/release/ outputs).",
+      "roots": [
+        "SmsWorkbench/build_dotnet.ps1",
+        "SmsWorkbench/clean_dotnet_workspaces.ps1",
+        "scripts/installer/"
+      ]
+    }
+  ],
+  "script_groups": {
+    "gate": {
+      "purpose": "Read-only gates, ratchets and guards. CI, the git hooks or a pytest wrapper invoke them by filename; a non-zero exit is a red build. None of them may write to the tree.",
+      "files": [
+        "architecture_scan.py",
+        "audit_protocol_broad_handlers.py",
+        "bare_print_ratchet.py",
+        "broad_except_ratchet.py",
+        "config_key_ratchet.py",
+        "config_schema_check.py",
+        "delayed_import_ratchet.py",
+        "docs_consistency_scan.py",
+        "dotnet_warning_ratchet.py",
+        "endpoints_literal_ratchet.py",
+        "entry_point_ratchet.py",
+        "experiment_ratchet.py",
+        "extractor_parity_report.py",
+        "format_guard.py",
+        "function_length_ratchet.py",
+        "import_layer_ratchet.py",
+        "ipc_schema_check.py",
+        "kernel_boundary_ratchet.py",
+        "lane_coupling_ratchet.py",
+        "line_ending_guard.py",
+        "mailbox_private_import_ratchet.py",
+        "module_coverage_check.py",
+        "pack_boundary_ratchet.py",
+        "payment_legacy_manifest.py",
+        "precommit_guard.py",
+        "provider_decoupling_ratchet.py",
+        "pyright_ratchet.py",
+        "result_schema_check.py",
+        "root_module_ratchet.py",
+        "scan_hardcoded_secrets.py",
+        "scan_release_payload.py",
+        "scan_sensitive_history.py",
+        "sensitive_field_scan.py",
+        "sentinel_asset_guard.py",
+        "services_import_resolution.py",
+        "spec_validate.py",
+        "sunk_copy_parity.py",
+        "unused_import_ratchet.py"
+      ]
+    },
+    "report": {
+      "purpose": "Generate a committed artefact (a doc, a graph, a reference table). They write, so they are run deliberately and their output is reviewed as a diff.",
+      "files": [
+        "dependency_graph.py",
+        "generate_cli_reference.py",
+        "refresh_doc_ratchet_numbers.py",
+        "refresh_doc_symbol_lines.py"
+      ]
+    },
+    "operator": {
+      "purpose": "Operational helpers that touch credentials, accounts, mailboxes or the network. Read the script before running it; several need an explicit flag to do anything destructive.",
+      "files": [
+        "at_survival_watch.py",
+        "batch_enable_2fa.py",
+        "cleanup_invalid_accounts.py",
+        "export_mailbox_2fa.py",
+        "mailbox_pool_liveness.py",
+        "mailbox_pool_orphans.py",
+        "probe_account_liveness.py",
+        "proxy_census.py",
+        "proxy_health_prune.py",
+        "proxy_pool_probe.py",
+        "proxy_screen.py",
+        "registration_ab.py",
+        "registration_inventory.py",
+        "runtime_retention.py"
+      ]
+    },
+    "build": {
+      "purpose": "Build, packaging, runtime staging and environment setup.",
+      "files": [
+        "build_installer_py.py",
+        "inject_dotnet_env.py",
+        "install_git_hooks.py",
+        "preflight_env.py"
+      ]
+    },
+    "refactor": {
+      "purpose": "Rewrite source. Each takes paths and rewrites them, so it is a reviewed act with the diff read afterwards, never a CI step.",
+      "files": [
+        "module_move.py",
+        "narrow_mapping_guards.py",
+        "repair_narrow_annotations.py"
+      ]
+    },
+    "scaffold": {
+      "purpose": "Generate a new unit of the platform.",
+      "files": [
+        "pack_new.py"
+      ]
+    },
+    "package": {
+      "purpose": "Package marker, not a tool. It exists so the gates can be imported as ``scripts.x`` by their pytest wrappers.",
+      "files": [
+        "__init__.py"
+      ]
+    }
+  }
+}

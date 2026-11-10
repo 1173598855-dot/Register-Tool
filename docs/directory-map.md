@@ -38,6 +38,16 @@ remain the runtime owners until a later migration records a parity test.
 | `start_proxy_pool.py` | Operator utility | Standalone proxy-pool server entrypoint: a SOCKS5 listener rotating over SOCKS5 **or** HTTP-CONNECT upstreams. |
 | `verify_proxy.py` | Operator utility | Proxy configuration verification; reads merged proxy/runtime/payment shards. |
 
+**The root is not a place for new code.** The complete, enforced inventory of
+ways into this repository -- CLI, desktop shell, the compatibility script, the
+operator utilities, the two `services/` projects and the build path -- lives in
+[entry points](current/entry-points.md) and
+`scripts/entry_point_manifest.json`. `scripts/entry_point_ratchet.py` fails when a
+root-level `*.py`, a `services/` project or a `SmsWorkbench*` project appears
+without a row, when a row names something deleted, or when a packaged artifact
+(`*.exe`/`*.msi`/`*.zip`/`*.7z`) is left at the root. Build outputs belong in the
+git-ignored `dist/`.
+
 ## Runtime and generated directories
 
 These directories are runtime state and are ignored by Git:

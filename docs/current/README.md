@@ -16,6 +16,7 @@
 | 邮箱 provider 能力、轮询与终止错误 | [mailbox.md](mailbox.md) | 注册流程 |
 | 一键接码的供应商与租号 | [one-click-sms.md](one-click-sms.md) | 注册流程 |
 | Provider pack 契约、清单、命名空间与多架构维护边界 | [provider-packs.md](provider-packs.md) | 当前 ChatGPT 协议实现细节 |
+| 全部入口（CLI/桌面/服务/脚本）的分类与"新入口放哪" | [entry-points.md](entry-points.md) | 单个模块的职责边界 |
 | 每套注册架构自己的运维/升级说明 | [../packs/](../packs/README.md) | 平台契约本身 |
 
 **事实的唯一归属**（改一处就别改第二处）：
@@ -53,6 +54,7 @@ below so existing links do not break:
 - [`mailbox.md`](mailbox.md) - 邮箱 provider 能力、配置注入、轮询和终止错误契约
 - [`one-click-sms.md`](one-click-sms.md) - 一键接码供应商、租号与持久化当前契约
 - [`provider-packs.md`](provider-packs.md) - provider-pack platform: manifest contract, derived namespaces, lifecycle hooks, operator entry points, migration route
+- [`entry-points.md`](entry-points.md) - 全部入口的分类、状态与"新入口放哪"的决策树（由 `scripts/entry_point_ratchet.py` 执法）
 - [`registration-and-proxy-architecture.md`](registration-and-proxy-architecture.md) - runtime control flow and code locations for registration and the proxy lanes
 - [`protocol-payment-enhancement.md`](protocol-payment-enhancement.md) - protocol payment architecture (routing/executor/normalisation); design proposal archived under `docs/audits/plans/`
 - [`paypal-zero-due-link.md`](paypal-zero-due-link.md) - PayPal zero-due link contract
