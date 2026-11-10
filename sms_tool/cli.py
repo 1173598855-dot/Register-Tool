@@ -91,15 +91,18 @@ def _load_batch_deps() -> None:
     global run_batch, filter_registered_mailboxes
     if run_batch is not None and filter_registered_mailboxes is not None:
         return
-    from .batch_runner import (
-        filter_registered_mailboxes as _filter,
-        run_batch_impl as _run,
-    )
+    from .batch_runner import filter_registered_mailboxes as _filter
 
     if filter_registered_mailboxes is None:
         filter_registered_mailboxes = _filter
     if run_batch is None:
-        run_batch = _run
+        # Same treatment as the single-account entry: the manifest names the
+        # batch runner, so which callable a cohort goes through is declared.
+        # `register_batch_impl` rather than the facade `register_batch` because
+        # this module calls `batch_runner.run_batch_impl` directly, and those are
+        # two different objects -- pointing at the facade here would silently
+        # change behaviour.
+        run_batch = _capability_entrypoint("account.registration.email", "register_batch_impl")
 
 
 def _load_storage_deps() -> None:

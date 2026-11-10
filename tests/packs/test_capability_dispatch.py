@@ -404,3 +404,53 @@ def test_without_a_selected_pack_the_payment_link_seam_is_untouched(
     cli._generate_ba_link(types.SimpleNamespace(pack=None))
 
     assert seen["factory"] is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.5: the batch registration entry
+# ---------------------------------------------------------------------------
+
+
+def test_the_batch_entrypoint_resolves_to_the_runner_the_cli_calls() -> None:
+    """Anti-drift: the manifest must name the object cli actually invokes."""
+    from sms_tool import batch_runner
+
+    resolved = dispatch.resolve_capability_entrypoint("account.registration.email", "register_batch_impl")
+
+    assert resolved is batch_runner.run_batch_impl
+
+
+def test_the_batch_entrypoint_is_not_the_orchestrator_facade() -> None:
+    """The facade and the implementation are two objects; swapping them is silent."""
+    from sms_tool import batch_runner
+    from sms_tool.registration import orchestrator
+
+    resolved = dispatch.resolve_capability_entrypoint("account.registration.email", "register_batch_impl")
+
+    assert resolved is not orchestrator.run_batch
+    assert resolved is batch_runner.run_batch_impl
+
+
+def test_the_cli_resolves_the_batch_runner_through_the_pack(monkeypatch: pytest.MonkeyPatch) -> None:
+    marker = object()
+    monkeypatch.setattr(cli, "_capability_entrypoint", lambda capability, entrypoint, pack_id=None: marker)
+    monkeypatch.setattr(cli, "run_batch", None)
+    monkeypatch.setattr(cli, "filter_registered_mailboxes", None)
+
+    cli._load_batch_deps()
+
+    assert cli.run_batch is marker
+
+
+def test_a_missing_batch_capability_surfaces_at_startup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The startup resolvers raise; only command paths turn this into exit 2."""
+
+    def unavailable(capability: str, entrypoint: str, **kwargs: Any) -> Any:
+        raise dispatch.CapabilityDispatchError("no enabled provider pack claims account.registration.email")
+
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", unavailable)
+    monkeypatch.setattr(cli, "run_batch", None)
+    monkeypatch.setattr(cli, "filter_registered_mailboxes", None)
+
+    with pytest.raises(dispatch.CapabilityDispatchError):
+        cli._load_batch_deps()
