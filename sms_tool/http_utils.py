@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-from urllib.parse import urlparse
 
 from .config import CFG
 from .auth_headers import auth_impersonate

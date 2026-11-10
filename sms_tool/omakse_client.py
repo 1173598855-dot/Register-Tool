@@ -23,7 +23,6 @@ import os
 import sys
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 
 import requests

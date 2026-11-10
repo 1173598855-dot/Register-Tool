@@ -5,12 +5,8 @@
     "sms_tool/account_creation.py": 1,
     "sms_tool/accounts/account_recovery.py": 5,
     "sms_tool/cli.py": 1,
-    "sms_tool/cpa_import.py": 1,
     "sms_tool/diagnostics.py": 1,
-    "sms_tool/http_utils.py": 1,
-    "sms_tool/import_targets.py": 3,
     "sms_tool/mailbox/router.py": 7,
-    "sms_tool/omakse_client.py": 1,
     "sms_tool/pay_link/adapters.py": 11,
     "sms_tool/pay_link/base.py": 9,
     "sms_tool/pay_link/core.py": 1,
@@ -66,5 +62,5 @@
     "tests/workbench/test_cli_registration_driver.py": 1,
     "tests/workbench/test_operator_output.py": 1
   },
-  "total": 244
+  "total": 238
 }
