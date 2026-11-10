@@ -34,7 +34,9 @@ def parse_wham_usage(body: Any) -> dict[str, Any] | None:
     if isinstance(body, str):
         try:
             body = json.loads(body)
-        except Exception:
+        except (TypeError, ValueError):
+            # A body that is not JSON at all. Transport failures never reach
+            # here: the caller only passes a body it already received.
             return None
     if not isinstance(body, dict):
         return None

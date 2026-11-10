@@ -49,7 +49,11 @@ def load_account_seed(email: str = "", session_file: str = "") -> tuple[dict[str
 def read_json(path: Path) -> dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8-sig"))
-    except Exception:
+    except (OSError, ValueError):
+        # Missing/unreadable file (OSError) or a body that is not JSON
+        # (ValueError covers JSONDecodeError and UnicodeDecodeError). A seed that
+        # cannot be read is reported as an empty seed; any other exception is a
+        # defect and must surface.
         return {}
 
 
