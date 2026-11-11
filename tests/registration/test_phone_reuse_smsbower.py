@@ -1493,5 +1493,48 @@ class ProviderKeyStatusTests(unittest.TestCase):
         self.assertIn("GRIZZLY_API_KEY", hint)
 
 
+class SmsBowerVendorCallFailureTests(unittest.TestCase):
+    """``complete`` / ``request_additional``: a vendor-call failure is ``False``, a defect is not.
+
+    Lane-level template (docs/audits/records/broad-except-boundary-2026-11-11.md §1.8):
+    ``set_status`` -> ``_do`` -> ``requests.get`` + ``raise_for_status``, so the
+    documented surface is ``requests.RequestException`` -- transport failures and
+    HTTP 4xx/5xx both land inside it.
+    """
+
+    def _client(self, error):
+        client = SmsBowerClient(api_key="test-key")
+        patcher = patch.object(client, "set_status", side_effect=error)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return client
+
+    def test_complete_degrades_on_a_transport_failure(self):
+        import requests
+
+        client = self._client(requests.ConnectionError("connection refused"))
+
+        self.assertFalse(client.complete("act-1"))
+
+    def test_complete_propagates_a_defect(self):
+        client = self._client(RuntimeError("bug in the vendor call"))
+
+        with self.assertRaises(RuntimeError):
+            client.complete("act-1")
+
+    def test_request_additional_degrades_on_a_transport_failure(self):
+        import requests
+
+        client = self._client(requests.Timeout("read timed out"))
+
+        self.assertFalse(client.request_additional("act-1"))
+
+    def test_request_additional_propagates_a_defect(self):
+        client = self._client(RuntimeError("bug in the vendor call"))
+
+        with self.assertRaises(RuntimeError):
+            client.request_additional("act-1")
+
+
 if __name__ == "__main__":
     unittest.main()

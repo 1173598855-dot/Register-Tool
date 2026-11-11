@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 870，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 868，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,10 +23,10 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 870 handlers (157 silent) across 182 files; whitelisted 9; budget 870/157
+broad-except: 868 handlers (157 silent) across 182 files; whitelisted 9; budget 868/157
 ```
 
-扫描得到 **23 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3–§1.7 六批泳道级决策已解决；§1.2 的四处本就不在候选里）。
+扫描得到 **21 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3–§1.8 七批泳道级决策已解决；§1.2 的四处本就不在候选里）。
 
 ## 1. 本轮**已经收窄**的 2 处（写在这里，免得被当成"还没做"）
 
@@ -199,10 +199,39 @@ broad-except: 870 handlers (157 silent) across 182 files; whitelisted 9; budget 
 
 **门禁代价**：`broad-except` 872 → **870**，silent 不变，**零新增 import**。
 
+### 1.8 第八批：`smsbower` 两处网络调用收窄，以及一处**判定为不可收窄**的站点
+
+**收窄（E 类 · 2 处 → 0）**：
+
+| 位置 | 前 | 后 |
+| --- | --- | --- |
+| `smsbower.complete` | `except Exception: return False` | `except _requests.RequestException:` |
+| `smsbower.request_additional` | 同上 | 同上 |
+
+依据是**调用链本身就写明了异常面**：`set_status` → `_do` → `_requests.get(...)` +
+`raise_for_status()`。所以 `requests.RequestException` 同时覆盖传输失败与 HTTP 4xx/5xx，
+而 `requests` 在本文件已经是**模块级别名 `_requests`** —— **零新增 import、零耦合代价**。
+测试四条（`ConnectionError` / `Timeout` 降级为 `False`，`RuntimeError` 外抛）。
+
+**判定为不可收窄（一个 A 类长相、其实是 never-raises 契约的站点）**：
+
+`upi_link/dump._upi_dump_http` 曾在 A 类表里（「文件 IO」）。核对 docstring 后**保持宽**：
+
+> **绝不抛异常**：dump 是诊断辅助，不能因为它自己的问题（磁盘满、权限不足、
+> **响应对象没有 `.text`**）把主流程带崩。所有失败都吞掉并返回 `""`。
+
+第三条枚举的正是 `AttributeError` —— 收窄成 `(OSError, TypeError, ValueError)` 会把它放出去，
+**违反 docstring 写下的契约**；而把 `AttributeError` 加进元组又会让元组变成
+`INTERNAL_EXCEPTION_TYPES` 的子集（元组归属门禁拒绝）。所以它归 **D 类（never-raises 契约）**，
+与 `http_client._is_edge_challenge` 同类。
+
+⇒ **这一批的意义不只是 −2**：它给出了模板的**否定判据** —— 当 docstring 明确承诺「绝不抛出」、
+并且枚举了 `AttributeError` 这类内部异常时，**宽是对的**，硬收窄才是 bug。
+
 ⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
 记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
 
-## 2. 剩下 23 处：为什么必须宽着
+## 2. 剩下 21 处：为什么必须宽着
 
 > 表的"收窄要先动"一列是**测试文件**，不是"改一行代码"：这些 handler 的宽度被行为测试
 > 或注入的替身钉住，改之前得先确认那些替身喂进去的东西是否还成立。
@@ -248,21 +277,19 @@ broad-except: 870 handlers (157 silent) across 182 files; whitelisted 9; budget 
 | `providers/cfworker_client.py:436` `_decode_rfc822_body` | `Parser(policy=...).parsestr(...)` | `email.errors.MessageError` **不是** ValueError 的子类；按 `(TypeError, ValueError)` 收窄会漏掉真正的畸形邮件 | — |
 | `providers/cfworker_client.py:465` `_decode_header_value` | `make_header(decode_header(...))` | `email.errors.HeaderParseError`，同上 | `tests/mailbox/test_cfworker_client.py` |
 
-### D. 外部资源 / 宿主数据库 — 4 处
+### D. 外部资源 / 宿主数据库 / never-raises 契约 — 4 处
 
 | 位置 | try 体 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
 | `browser_pool.py:145` `_browser_footprint_mb` | psutil 进程树遍历（内层已按 `_psutil.Error` 收窄） | 外层是 advisory 内存测量：`# noqa: BLE001 - advisory measurement only` | — |
-| `upi_link/dump.py:130` `_upi_dump_http` | `directory.mkdir` + `path.write_text` + 若干格式化帮手 | 文件系统 + 若干私有帮手，异常面跨函数 | `tests/payment/test_upi_extract_pure.py`、`tests/payment/test_upi_tax_repeat.py` |
+| `upi_link/dump.py` `_upi_dump_http` | `directory.mkdir` + `path.write_text` + 格式化帮手 | docstring 承诺「绝不抛异常」，并明确枚举「响应对象没有 `.text`」——即 `AttributeError`；收窄会违反该契约，加进元组又成内部子集（见 §1.8） | — |
 | `pp_link_helpers.py:692` `reserve_billing_variant` | 跨进程锁 + JSON 读写 | 自己的注释：`GateTimeoutError`、`OSError`、JSON 垃圾、**以及其它任何东西**都必须降级，因为身份是 advisory | `tests/payment/test_paypal_pp_link_helpers.py` |
 | `batch_runner.py:688` `_prewarmed_sentinel` | `future.result()` | `result()` **会重新抛出 worker 的任意异常** —— 收窄在语义上不可能 | — |
 
-### E. try 体里就是网络调用 — 2 处
+### E. try 体里就是网络调用 — 0 处
 
 | 位置 | try 体 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
-| `smsbower.py:207` `complete` | `self.set_status(activation_id, "6")` | `_do("setStatus", ...)` 是一次网络往返，失败要返回 False 而不是炸 | `tests/registration/test_phone_reuse_smsbower.py`（`complete` 是常用词，全仓 82 个文件命中，真实 pin 是这一个） |
-| `smsbower.py:254` `request_additional` | `self.set_status(activation_id, "3")` | 同上 | `tests/registration/test_nexsms_client_pure.py`、`test_phone_reuse_smsbower.py` |
 
 *（注：`payment/capability.py` 的 `_read_payment_methods_signal` 曾是这一类的第二个点位，
 现已按 §1.1 的泳道级决策解决，不再出现在候选里。）*
@@ -277,7 +304,7 @@ broad-except: 870 handlers (157 silent) across 182 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 870，七批泳道级点位）；第二半的第一个
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 868，八批泳道级决策）；第二半的第一个
 点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）

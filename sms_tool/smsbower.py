@@ -204,7 +204,11 @@ class SmsBowerClient:
     def complete(self, activation_id: str) -> bool:
         try:
             return self.set_status(activation_id, "6") == "ACCESS_ACTIVATION"
-        except Exception:
+        except _requests.RequestException:
+            # `set_status` -> `_do` -> `_requests.get` + `raise_for_status`, so the
+            # documented surface is the requests exception hierarchy (transport
+            # failures *and* HTTP 4xx/5xx). A defect is not a vendor refusal -- see
+            # docs/audits/records/broad-except-boundary-2026-11-11.md §1.8.
             return False
 
     def cancel(self, activation_id: str) -> bool:
@@ -251,7 +255,8 @@ class SmsBowerClient:
     def request_additional(self, activation_id: str) -> bool:
         try:
             return self.set_status(activation_id, "3") in {"ACCESS_RETRY_GET", "ACCESS_READY"}
-        except Exception:
+        except _requests.RequestException:
+            # Same surface as `complete`: the vendor call's transport/HTTP errors.
             return False
 
     def get_countries(self) -> list[dict]:
