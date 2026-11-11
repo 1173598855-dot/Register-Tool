@@ -112,7 +112,7 @@
 | 注册表读盘缓存（`(path, size, sha256)` 记忆化，显式 roots 不缓存） | 落地 | `tests/packs/test_registry_cache.py` |
 | 派生命名空间 + 生命周期钩子 + 边界棘轮 4 条零基线 | 落地 | `python scripts/pack_boundary_ratchet.py` |
 | `--pack-info` 带 `configured_toggles`（pack 作用域配置读取） | 落地 | `python -m sms_tool --pack-info openai.chatgpt --json` |
-| 已接线能力 | `account.health`、`account.registration.email`（单账号 + 批量）、`payment.link`（显式 `--pack` 时注入）、**`session.access_token`（AT 探活）、`mailbox.otp`（取码）** | `tests/packs/`（91 例） |
+| 已接线能力 | `account.health`、`account.registration.email`（单账号 + 批量）、`payment.link`（显式 `--pack` 时注入）、**`session.access_token`（AT 探活）、`mailbox.otp`（取码）、`payment.batch`（批量支付）** | `tests/packs/`（91 例） |
 | 未接线能力 | **无**（2026-11-11 起 2.1/2.2 已用函数内导入接上；此前"import 预算挡住"的判断被实测推翻：`import-layer` 仍 459/78） | 方案 Phase 2 表 |
 
 ## 4. 测试与类型基线

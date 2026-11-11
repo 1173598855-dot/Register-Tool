@@ -507,3 +507,66 @@ def test_an_unknown_entrypoint_name_is_a_named_error() -> None:
         dispatch.resolve_capability_entrypoint("mailbox.otp", "no_such_entrypoint")
 
     assert "no entrypoint" in str(excinfo.value)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.5: the batch payment capability
+# ---------------------------------------------------------------------------
+
+
+def test_the_batch_payment_entrypoint_is_the_shipped_runner() -> None:
+    from sms_tool.payment import batch
+
+    resolved = dispatch.resolve_capability_entrypoint("payment.batch", "payment_batch")
+
+    assert resolved is batch.run_payment_batch
+
+
+def test_the_cli_injects_the_batch_payment_runner(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Wiring proof: without this the batch-payment seam would have no caller."""
+    from sms_tool.commands import payment as payment_commands
+
+    marker = object()
+    seen: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        payment_commands,
+        "extract_payment_link",
+        lambda args, ctx, *, batch_runner=None: seen.update(runner=batch_runner),
+    )
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", lambda capability, entrypoint, **kw: marker)
+
+    cli._extract_payment_link(types.SimpleNamespace(pack="acme.portal"))
+
+    assert seen["runner"] is marker
+
+
+def test_without_a_selected_pack_the_batch_payment_seam_is_untouched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No --pack means no injection: the default path keeps the direct import."""
+    from sms_tool.commands import payment as payment_commands
+
+    seen: dict[str, Any] = {}
+
+    monkeypatch.setattr(
+        payment_commands,
+        "extract_payment_link",
+        lambda args, ctx, *, batch_runner=None: seen.update(runner=batch_runner),
+    )
+
+    cli._extract_payment_link(types.SimpleNamespace(pack=None))
+
+    assert seen["runner"] is None
+
+
+def test_a_missing_batch_payment_pack_exits_two(monkeypatch: pytest.MonkeyPatch) -> None:
+    def unavailable(capability: str, entrypoint: str, **kwargs: Any) -> Any:
+        raise dispatch.CapabilityDispatchError("no enabled provider pack claims payment.batch")
+
+    monkeypatch.setattr(dispatch, "resolve_capability_entrypoint", unavailable)
+
+    with pytest.raises(SystemExit) as excinfo:
+        cli._extract_payment_link(types.SimpleNamespace(pack="acme.portal"))
+
+    assert excinfo.value.code == 2

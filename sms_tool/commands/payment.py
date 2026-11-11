@@ -690,8 +690,14 @@ def _print_payment_qualification_summary(result: Mapping[str, Any]) -> None:
         safe_print(f"[!] {item.get('email') or ''}: {badge}{detail}")
 
 
-def extract_payment_link(args: Any, context: PaymentCommandContext) -> None:
-    """Extract a supported protocol payment link from an AT or saved account."""
+def extract_payment_link(args: Any, context: PaymentCommandContext, *, batch_runner: Any = None) -> None:
+    """Extract a supported protocol payment link from an AT or saved account.
+
+    ``batch_runner`` is the injected ``payment.batch`` capability: the CLI resolves
+    it from the provider pack when an architecture is selected explicitly, so which
+    batch implementation runs is a manifest decision. It defaults to the direct
+    import, which keeps every existing caller and test unchanged.
+    """
     from ..desktop_ipc import emit_event, emit_result
     from ..payment.link_manager import generate_payment_link
 
@@ -770,7 +776,7 @@ def extract_payment_link(args: Any, context: PaymentCommandContext) -> None:
             "require_zero": not getattr(args, "no_require_zero", False),
         }
         try:
-            report = run_payment_batch(
+            report = (batch_runner or run_payment_batch)(
                 emails,
                 payment_method=method,
                 workers=getattr(args, "workers", 1),

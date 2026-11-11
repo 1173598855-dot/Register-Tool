@@ -275,7 +275,7 @@ manifest 声明的是**能力**，真正决定"哪套架构的哪个可调用对
 | `payment.link` | `--generate-ba-link` | **仅显式 `--pack` 时**注入 `link_factory`；默认保留支付泳道自己的方法注册表 |
 | `session.access_token` | `registration/orchestrator._pack_access_token_probe()` → operations bundle | 构建 bundle 时解析；模块级名字仍是默认值，所以测试替身照旧生效 |
 | `mailbox.otp` | `registration/orchestrator._resolve_lazy_export()`（惰性再导出表） | 先问 pack，失败回落到原模块 |
-| `payment.batch` | 未接线 | 待 P3 之后 |
+| `payment.batch` | `--extract-payment-link` 的批量子路径 | 同 `payment.link`：**仅显式 `--pack` 时**注入 `batch_runner`，默认保留直接导入 |
 
 后两条的分派都在**函数内**导入 `packs.dispatch`：`import_layer_ratchet` 的模块级预算因此一分未动
 （459 边 / 78 对）。代价是两条**有书面理由**的 deferred 边

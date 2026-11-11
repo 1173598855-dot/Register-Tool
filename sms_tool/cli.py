@@ -1309,7 +1309,13 @@ def _test_payment_proxies(args):
 
 
 def _extract_payment_link(args):
-    return payment_commands.extract_payment_link(args, _payment_command_context())
+    # Same rule as `--generate-ba-link`: the pack's batch runner is injected only
+    # when an architecture was selected explicitly, because the default path keeps
+    # the direct import that tests patch (`commands.payment.run_payment_batch`).
+    batch_runner = None
+    if getattr(args, "pack", None):
+        batch_runner = _capability_entrypoint_or_exit(args, "payment.batch", "payment_batch", "--extract-payment-link")
+    return payment_commands.extract_payment_link(args, _payment_command_context(), batch_runner=batch_runner)
 
 
 def _convert_session_json(args):

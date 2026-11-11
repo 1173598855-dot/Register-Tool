@@ -96,7 +96,7 @@ registry 时永不缓存」；性能上批处理里 `load_registry` 调用次数
 | 2.2 | `mailbox.otp` | 取码（`registration/orchestrator.py` 的惰性再导出 `poll_email_otp`） | **✅ 已完成（2026-11-11）**：`orchestrator._resolve_lazy_export()` 对`_CAPABILITY_BACKED_EXPORTS` 里的名字先问 pack，失败再回落到原模块 —— 单 pack 构建行为逐字节不变 |
 | 2.3 | `payment.link` | `--generate-ba-link` → `commands/payment_links.py` | **已完成**：只在显式给了 `--pack` 时注入 `link_factory`；默认保留支付泳道自己的方法注册表（不然就是第二套注册表） |
 | 2.4 | `account.registration.email` | `cli._load_heavy_deps` 解析 `run_email` | **已完成**：manifest 决定注册入口，不再是 import；单 pack 时是同对象 |
-| 2.5 | `payment.batch` + 批量注册 | `cli._main_registration_pipeline` | 待做（依赖 2.4 的批量路径） |
+| 2.5 | `payment.batch` | `--extract-payment-link` 的批量子路径（`commands/payment.py`） | **✅ 已完成（2026-11-11）**：`batch_runner=` 关键字注入，与 2.3/2.4 同规则 —— **仅显式 `--pack` 时**注入，默认保留 `commands.payment.run_payment_batch` 这条测试 patch 面。模块级边未增（那条 import 本来就是函数内） |
 | 2.6 | 台账 code↔ledger 双向 | 新增 pack 作用域 flag reader | 待做 |
 
 **2.1/2.2 触发了另一道门禁，并已按它的机制处理**：`lane_coupling_ratchet` 规则 5 冻结

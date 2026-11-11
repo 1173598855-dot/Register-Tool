@@ -21,6 +21,7 @@
   "entrypoints": {
     "access_token_probe": "sms_tool.registration.orchestrator:_probe_registration_access_token",
     "account_liveness": "sms_tool.accounts.account_liveness:probe_account_liveness",
+    "payment_batch": "sms_tool.payment.batch:run_payment_batch",
     "paypal_link": "sms_tool.gen_pp_link:generate_pp_link",
     "poll_email_otp": "sms_tool.mailbox.router:poll_email_otp",
     "register_batch": "sms_tool.registration.orchestrator:run_batch",
