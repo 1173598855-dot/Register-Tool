@@ -202,7 +202,11 @@ def _cached_exit_ip(proxy: str | None) -> str:
     """
     try:
         geo = shared_geo_resolver().cached(proxy)
-    except Exception:
+    except (OSError, TypeError, ValueError):
+        # Cache-file read (OSError) and the cache key's own parse
+        # (TypeError/ValueError). A defect must not blank a bookkeeping field that
+        # otherwise reads as "nothing measured yet" -- lane-level template in
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.4.
         return ""
     return str(getattr(geo, "ip", "") or "") if geo else ""
 

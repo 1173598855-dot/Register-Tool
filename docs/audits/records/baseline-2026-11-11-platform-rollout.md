@@ -46,12 +46,12 @@
 | 债 | 起点 | 现在 | 复现命令 |
 | --- | --- | --- | --- |
 | unused import | 256（基线 257） | **0**（0 文件，轴已闭合） | `python scripts/unused_import_ratchet.py` |
-| broad except | 959 / 158 silent（预算 960/158） | **876 / 157**（预算 876/157） | `python scripts/broad_except_ratchet.py` |
+| broad except | 959 / 158 silent（预算 960/158） | **874 / 157**（预算 874/157） | `python scripts/broad_except_ratchet.py` |
 
 两条轴的推进方式与**边界**（都已写进方案）：
 
 - **broad-except**：跨泳道的结构性回退（解析、类型强转、属性探测）已做完 70 处；剩下的候选
-  已逐个评审并落盘到 `broad-except-boundary-2026-11-11.md` —— 29 处分五类，每类都写明
+  已逐个评审并落盘到 `broad-except-boundary-2026-11-11.md` —— 27 处分五类，每类都写明
   「为什么必须宽」与「真要收窄得先动哪些测试」。再往下走是泳道级决策，不是 per-file 切片。
 - **unused-import：已闭合（257 → 0）。** 每一条都属于六类**接缝**之一，处理方式只有两种：
   **删**（真死代码）或**就地声明**（`__all__` / `# noqa: F401` + 理由）。清零后这条轴的含义

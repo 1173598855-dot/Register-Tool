@@ -462,6 +462,19 @@ def test_a_hint_only_geo_answer_is_not_reported_as_measured(monkeypatch):
     assert pq._measured_country("http://user-region-VN-sid-a:pass@h:1") == "VN"
 
 
+def test_a_defect_in_the_geo_probe_is_not_an_unmeasured_exit(monkeypatch):
+    """Lane-level decision: a bug used to read as "nothing has probed this proxy"."""
+    monkeypatch.undo()
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("bug in resolve_proxy_geo")
+
+    monkeypatch.setattr("sms_tool.geo.resolve_proxy_geo", boom)
+
+    with pytest.raises(RuntimeError):
+        pq._measured_country("http://user-region-VN-sid-a:pass@h:1")
+
+
 def test_a_socks5_proxy_in_a_probe_error_is_redacted(monkeypatch):
     def raising(**kwargs):
         raise RuntimeError("socks5://alice:secret@host:1080 failed")

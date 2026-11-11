@@ -236,7 +236,11 @@ def _measured_country(proxy: str | None) -> str:
         from ..geo import resolve_proxy_geo
 
         geo = resolve_proxy_geo(proxy, hint="", need_timezone=True)
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # Lazy import + a network geo probe: transport is OSError, parse rejects are
+        # TypeError/ValueError. A defect must not report as "not measured", which is
+        # indistinguishable from a proxy nothing has probed yet -- see the lane-level
+        # template in docs/audits/records/broad-except-boundary-2026-11-11.md §1.4.
         return ""
     if str(getattr(geo, "source", "") or "") == "hint":
         return ""

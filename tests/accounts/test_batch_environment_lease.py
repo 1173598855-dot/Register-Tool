@@ -18,6 +18,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from sms_tool.store import connection
 from sms_tool.batch_runner import (
     _cached_exit_ip,
@@ -236,6 +238,29 @@ def test_cached_exit_ip_is_blank_when_nothing_was_measured():
         assert _cached_exit_ip(POOL_A) == ""
         assert _cached_exit_ip("") == ""
         assert _cached_exit_ip(None) == ""
+
+
+def test_a_broken_geo_cache_is_not_an_unmeasured_egress():
+    """A cache read failure blanks the field; the handler narrows to (OSError, ...)."""
+
+    class _Boom:
+        def cached(self, proxy):
+            raise OSError("cache file unreadable")
+
+    with patch("sms_tool.batch_runner.shared_geo_resolver", lambda: _Boom()):
+        assert _cached_exit_ip(POOL_A) == ""
+
+
+def test_a_defect_in_the_geo_cache_propagates():
+    """Lane-level decision: a bug used to be indistinguishable from "not measured"."""
+
+    class _Boom:
+        def cached(self, proxy):
+            raise RuntimeError("bug in the resolver")
+
+    with patch("sms_tool.batch_runner.shared_geo_resolver", lambda: _Boom()):
+        with pytest.raises(RuntimeError):
+            _cached_exit_ip(POOL_A)
 
 
 # --------------------------------------------------------------------------
