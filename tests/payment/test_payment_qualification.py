@@ -1081,3 +1081,33 @@ def test_an_eligible_account_reports_no_error_from_a_derived_row():
     assert result["payment_qualification_state"] == QUALIFICATION_ELIGIBLE
     assert result["error"] == ""
     assert result["status_code"] == 0
+
+
+# ---------------------------------------------------------------------------
+# _dedicated_pool: "not configured" is not "the lane resolver broke"
+# ---------------------------------------------------------------------------
+
+
+def test_dedicated_pool_degrades_when_the_lane_pool_cannot_be_read(monkeypatch):
+    """A config read failure is an empty dedicated pool (lane-level template §1.7)."""
+    from sms_tool.payment import qualification_batch as pqb
+
+    def boom(*_args, **_kwargs):
+        raise OSError("config shard unreadable")
+
+    monkeypatch.setattr(pqb, "configured_qualification_proxy_pool", boom)
+
+    assert pqb._dedicated_pool() == []
+
+
+def test_dedicated_pool_propagates_a_defect(monkeypatch):
+    """A bug used to be indistinguishable from "no dedicated exit configured"."""
+    from sms_tool.payment import qualification_batch as pqb
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("bug in configured_qualification_proxy_pool")
+
+    monkeypatch.setattr(pqb, "configured_qualification_proxy_pool", boom)
+
+    with pytest.raises(RuntimeError):
+        pqb._dedicated_pool()

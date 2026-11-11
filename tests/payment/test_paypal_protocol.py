@@ -69,5 +69,24 @@ class PayPalProtocolTests(unittest.TestCase):
         self.assertTrue(any("body=" in entry for entry in logs))
 
 
+class LoadConfigTests(unittest.TestCase):
+    """The merged-config read: a shard failure is "no config", a defect is not.
+
+    Lane-level template (docs/audits/records/broad-except-boundary-2026-11-11.md
+    §1.7). ``ConfigError`` is deliberately outside the caught tuple: the one caller
+    (``_paypal_redirect_impersonate``) already degrades it to ``"chrome136"``, while
+    an empty dict here would report a broken config as "nothing configured".
+    """
+
+    def test_degrades_when_the_shards_cannot_be_read(self):
+        with patch("sms_tool.config.load_merged_config", side_effect=OSError("shard unreadable")):
+            self.assertEqual(paypal_protocol._load_config(), {})
+
+    def test_propagates_a_defect(self):
+        with patch("sms_tool.config.load_merged_config", side_effect=RuntimeError("bug in the merge")):
+            with self.assertRaises(RuntimeError):
+                paypal_protocol._load_config()
+
+
 if __name__ == "__main__":
     unittest.main()

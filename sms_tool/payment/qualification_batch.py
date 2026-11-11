@@ -330,7 +330,10 @@ def _dedicated_pool() -> list[str]:
     """The operator's dedicated qualification exit (empty when unconfigured)."""
     try:
         return list(configured_qualification_proxy_pool() or [])
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # The callee lazily imports config + routing, then parses the lane pool:
+        # ImportError, OSError, TypeError/ValueError. A defect is not "no dedicated
+        # pool" -- see docs/audits/records/broad-except-boundary-2026-11-11.md §1.7.
         return []
 
 

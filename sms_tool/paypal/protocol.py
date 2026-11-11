@@ -42,7 +42,12 @@ def _load_config() -> dict[str, Any]:
         from ..config import load_merged_config
 
         return load_merged_config()
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # Lazy import plus a shard read/merge: ImportError, OSError, and the merge's
+        # own rejects. A ConfigError is deliberately NOT caught -- the one caller
+        # (`_paypal_redirect_impersonate`) already degrades it to "chrome136", while
+        # an empty dict here would mask a broken config as "nothing configured". See
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.7.
         return {}
 
 
