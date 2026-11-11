@@ -269,3 +269,41 @@ def test_a_defect_is_not_reported_as_no_rank(monkeypatch):
 
     with pytest.raises(RuntimeError):
         admin._health_rank(CONFIG)
+
+
+# ---------------------------------------------------------------------------
+# _cached_geo: "not measured yet" is not the same answer as "the cache broke"
+# ---------------------------------------------------------------------------
+
+
+def test_cached_geo_reads_the_shared_cache():
+    shared_geo_resolver().remember("http://cached.example:1", ProxyGeo(country="PH", asn="AS1"))
+
+    assert admin._cached_geo("http://cached.example:1")["country"] == "PH"
+
+
+def test_an_unmeasured_exit_is_no_geo():
+    assert admin._cached_geo("http://never-measured.example:1") == {}
+
+
+def test_a_cache_read_failure_is_no_geo(monkeypatch):
+    class _Boom:
+        def cached(self, proxy):
+            raise OSError("cache file unreadable")
+
+    monkeypatch.setattr("sms_tool.geo.shared_geo_resolver", lambda: _Boom())
+
+    assert admin._cached_geo("http://x:1") == {}
+
+
+def test_a_defect_in_the_geo_cache_propagates(monkeypatch):
+    """Lane-level decision: a broken cache used to read as "nothing measured yet"."""
+
+    class _Boom:
+        def cached(self, proxy):
+            raise RuntimeError("bug in the resolver")
+
+    monkeypatch.setattr("sms_tool.geo.shared_geo_resolver", lambda: _Boom())
+
+    with pytest.raises(RuntimeError):
+        admin._cached_geo("http://x:1")

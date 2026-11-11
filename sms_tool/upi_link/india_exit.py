@@ -59,7 +59,11 @@ def _upi_india_exit_timeout(upi_cfg: Any) -> float:
 def _upi_exit_country(proxy: str, timeout: float, ops: ExitOps) -> str:
     try:
         geo = ops.resolve_proxy_geo(proxy, hint="IN", timeout=timeout)
-    except Exception:
+    except (OSError, TypeError, ValueError):
+        # A geo lookup is a network read: transport failures are OSError, and the
+        # resolver's own parse rejects are TypeError/ValueError. A defect is not
+        # "unknown country" -- see the lane-level template in
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.3.
         return ""
     return str(getattr(geo, "country", "") or "").strip().upper()
 
@@ -86,7 +90,9 @@ def _upi_exit_admits_checkout(proxy: str, timeout: float, ops: ExitOps) -> bool:
 def _upi_rotate_region_session(proxy: str, country: str, ops: ExitOps) -> str:
     try:
         return str(ops.rotate_session(proxy, country) or proxy)
-    except Exception:
+    except (OSError, TypeError, ValueError):
+        # Same surface as the geo lookup above: the rotation parses the credential
+        # template (TypeError/ValueError) and can fail on the wire (OSError).
         return proxy
 
 

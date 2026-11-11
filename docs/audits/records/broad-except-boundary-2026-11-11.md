@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 880，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 876，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,10 +23,10 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 880 handlers (157 silent) across 184 files; whitelisted 9; budget 880/157
+broad-except: 876 handlers (157 silent) across 182 files; whitelisted 9; budget 876/157
 ```
 
-扫描得到 **33 个**候选（本轮开始时 38 个：§1 的两处结构回退，加上 §1.1/§1.3 的两处泳道级决策已解决；§1.2 的四处本就不在候选里）。
+扫描得到 **29 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3/§1.4 三批泳道级决策已解决；§1.2 的四处本就不在候选里）。
 
 ## 1. 本轮**已经收窄**的 2 处（写在这里，免得被当成"还没做"）
 
@@ -123,18 +123,45 @@ broad-except: 880 handlers (157 silent) across 184 files; whitelisted 9; budget 
 `(OSError, TypeError, ValueError)` 是字面量元组，不是 `INTERNAL_EXCEPTION_TYPES` 的子集
 （有 OSError 与 ValueError 两个外部成员），所以元组归属门禁放行，耦合数一分未动。
 
+### 1.4 第四批：`upi_link` 两处 + `proxy/admin._cached_geo`（共四个 handler）
+
+四个点位一起做，因为它们是同一类：**被调方已经把异常面收窄了，或者本来就是"降级"语义**。
+
+| 位置 | 收窄成 | 依据 |
+| --- | --- | --- |
+| `upi_link/config._upi_retarget_region` | `(ImportError, TypeError, ValueError)` | 惰性导入 + `retarget_region` 自己把 `urlsplit` 收窄成 TypeError/ValueError 并返回入参 |
+| `upi_link/india_exit._upi_exit_country` | `(OSError, TypeError, ValueError)` | 地理查询是**网络读**：传输失败是 OSError，解析拒绝是 TypeError/ValueError |
+| `upi_link/india_exit._upi_rotate_region_session` | 同上 | 换会话同样解析凭证模板（TypeError/ValueError）也可能走线（OSError） |
+| `proxy/admin._cached_geo` | `(ImportError, OSError, TypeError, ValueError)` | 惰性导入 + 缓存文件读（OSError）+ 缓存键解析（TypeError/ValueError） |
+
+**这批的共同点**：四个 handler 的 `return` 值（原样代理 / 空国家 / 原代理 / 空 geo）都是
+**"没有答案"**，而缺陷此前也被塞进同一个返回值里。现在缺陷向外抛。
+
+**测试（这一步是泳道级决策的真实代价）**：
+
+| 文件 | 处理 |
+| --- | --- |
+| `tests/payment/test_upi_india_exit.py` | **两处既有替身从 `RuntimeError` 换成 `OSError`**（`test_exit_country_is_empty_when_geo_fails`、`test_a_raising_rotate_keeps_the_candidate_instead_of_crashing`）——它们要验的是"传输失败降级"，就必须喂 `TRANSPORT_ERRORS` 成员；另新增两条缺陷外抛测试 |
+| `tests/payment/test_upi_config_region.py` | **新文件**（此前零覆盖）：5 条 —— 重定向成功、无模板不动、国家码非法短路、解析拒绝保留原值、**缺陷外抛** |
+| `tests/proxy/test_proxy_admin.py` | 新增 4 条 `_cached_geo`：缓存命中、未测过为空、缓存读失败为空、**缺陷外抛** |
+
+**门禁代价**：`broad-except` 880 → **876**（files 184 → 182），silent 不变；同样**零新增 import**
+（四个元组都是字面量，都含外部成员 → 不是 `INTERNAL_EXCEPTION_TYPES` 子集），
+`sunk-copy parity` 3 对仍一致（`upi_link` 是沉底副本泳道，改前改后都跑了）。
+
 ⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
 记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
 
-## 2. 剩下 33 处：为什么必须宽着
+## 2. 剩下 29 处：为什么必须宽着
 
 > 表的"收窄要先动"一列是**测试文件**，不是"改一行代码"：这些 handler 的宽度被行为测试
 > 或注入的替身钉住，改之前得先确认那些替身喂进去的东西是否还成立。
 
-### A. try 体调用的是别处的函数（异常面不在本文件里）— 22 处
+### A. try 体调用的是别处的函数（异常面不在本文件里）— 18 处
 
 | 位置 | try 体调用的东西 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
+| ~~`upi_link/config` + `india_exit` 两处 + `proxy/admin._cached_geo`~~ | 见 §1.4 | **已按 §1.4 解决**：被调方已收窄或本就是降级语义，照抄即可 | — |
 | `auth_headers.py:676` `_timezone_offset_minutes` | `offset_minutes_for_timezone` | 该函数自己文档写明"失败降级为 0 并打一次警告" | — |
 | `batch_runner.py:205` `_cached_exit_ip` | `shared_geo_resolver().cached` | docstring：**Never probes**，批处理退出路径不该为记账字段付一次地理往返 | `tests/accounts/test_batch_environment_lease.py` |
 | `batch_runner.py:230` `_hold_environment_lease` | `acquire_environment_lease` | 自己的注释：租约是观测通道，**绝不能拖垮批次** | `tests/accounts/test_batch_environment_lease.py` |
@@ -150,14 +177,10 @@ broad-except: 880 handlers (157 silent) across 184 files; whitelisted 9; budget 
 | `payment/wire.py:312` `_checkout_sentinel_headers` | 惰性导入 + `checkout_sentinel_headers(...)` | 该调用本身发网络请求 | — |
 | `paypal/protocol.py:45` `_load_config` | 惰性导入 + `load_merged_config()` | 分片读盘 + 合并，失败类型不止 ValueError | — |
 | ~~`proxy/admin.py` `_health_rank` 两处~~ | `ProxyHealthTracker` / `resolve_registration` / `rank` | **已按 §1.3 解决**：被调方自己文档化了 `(OSError, TypeError, ValueError)`，照抄即可 | — |
-| `proxy/admin.py:74` `_cached_geo` | `shared_geo_resolver().cached` | 同 `batch_runner._cached_exit_ip` | `tests/proxy/test_proxy_admin.py` |
 | `proxy/asn_registry.py:116` `_proxy_key` | 惰性导入 + `parse_proxy` + `ProxyHealthTracker.key` | 三个调用串起来，异常面跨模块 | `tests/payment/test_extractor_parity_report.py` |
 | `proxy/asn_registry.py:502` `record_registration_outcome` | `AsnRegistry.from_config(config)` | 配置读取 + 注册表构造 | `tests/proxy/test_asn_registry.py` |
 | `proxy/registry.py:212` `resolve_mailbox` | 惰性导入 + `mailbox_proxy_candidates(...)` | 自己的注释：**census 不能因部分配置失败**，且它拉 provider 适配器 | `tests/mailbox/test_mailbox_otp_dispatch_log.py`、`tests/proxy/test_proxy_registry.py` |
 | `proxy/routing.py:181` `_saved_registration_proxy` | 惰性导入 + `resolve_account_proxy(...)` | 解析账号代理，异常面在 accounts 层 | — |
-| `upi_link/config.py:97` `_upi_retarget_region` | `retarget_region(...)` | 代理重定向（内部还会走 urlsplit 等） | — |
-| `upi_link/india_exit.py:62` `_upi_exit_country` | `ops.resolve_proxy_geo(...)` | 注入的 ExitOps，真实地理往返 | `tests/payment/test_upi_india_exit.py` |
-| `upi_link/india_exit.py:89` `_upi_rotate_region_session` | `ops.rotate_session(...)` | 注入的 ExitOps，真实换出口 | — |
 
 ### B. 形状的自然元组是 `INTERNAL_EXCEPTION_TYPES` 的子集 — 3 处
 
@@ -207,7 +230,7 @@ broad-except: 880 handlers (157 silent) across 184 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 880，含本轮三处泳道级点位）；第二半的第一个
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 876，四批泳道级点位）；第二半的第一个
 点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）

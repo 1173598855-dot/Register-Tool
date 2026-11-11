@@ -81,11 +81,41 @@ def test_select_returns_last_candidate_on_exhaustion(monkeypatch):
 
 
 def test_exit_country_is_empty_when_geo_fails(monkeypatch):
+    """A transport failure is an unknown country, not a defect (lane-level decision)."""
+
     def boom(*_a, **_k):
-        raise RuntimeError("geo down")
+        raise OSError("geo probe hit the wire and died")
 
     monkeypatch.setattr(p, "resolve_proxy_geo", boom)
     assert p._upi_exit_country("http://u:p@exit:1", 5) == ""
+
+
+def test_a_defect_in_the_geo_lookup_is_not_an_unknown_country(monkeypatch):
+    """``except Exception`` made a bug look like "we could not measure this exit"."""
+
+    def boom(*_a, **_k):
+        raise RuntimeError("bug in the resolver")
+
+    monkeypatch.setattr(p, "resolve_proxy_geo", boom)
+    with pytest.raises(RuntimeError):
+        p._upi_exit_country("http://u:p@exit:1", 5)
+
+
+def test_rotation_failure_keeps_the_original_proxy(monkeypatch):
+    def boom(*_a, **_k):
+        raise OSError("rotation endpoint refused")
+
+    monkeypatch.setattr(p, "rotate_session", boom)
+    assert p._upi_rotate_region_session("http://u:p@exit:1", "IN") == "http://u:p@exit:1"
+
+
+def test_a_defect_in_rotation_propagates(monkeypatch):
+    def boom(*_a, **_k):
+        raise RuntimeError("bug in rotate_session")
+
+    monkeypatch.setattr(p, "rotate_session", boom)
+    with pytest.raises(RuntimeError):
+        p._upi_rotate_region_session("http://u:p@exit:1", "IN")
 
 
 def test_transport_failure_is_no_evidence_not_a_refusal(monkeypatch):
@@ -129,12 +159,18 @@ def test_timeout_falls_back_to_the_env_then_to_its_default(monkeypatch):
 
 
 def test_a_raising_rotate_keeps_the_candidate_instead_of_crashing(monkeypatch):
-    """A dead rotate endpoint must not fail the payment attempt by itself."""
+    """A dead rotate endpoint must not fail the payment attempt by itself.
+
+    The double raises ``OSError`` on purpose: the handler narrows to
+    (OSError, TypeError, ValueError), so a *transport* failure keeps the candidate
+    while a defect propagates (see the lane-level template in
+    docs/audits/records/broad-except-boundary-2026-11-11.md §1.3).
+    """
     monkeypatch.setattr(p, "resolve_proxy_geo", lambda proxy, **kw: SimpleNamespace(country="DZ"))
     monkeypatch.setattr(p, "probe_openai_edge", lambda proxy, path="", timeout=0: _verdict(200))
 
     def boom(*_a, **_k):
-        raise RuntimeError("rotate endpoint down")
+        raise OSError("rotate endpoint down")
 
     monkeypatch.setattr(p, "rotate_session", boom)
     proxy = "http://u:p@exit:1"

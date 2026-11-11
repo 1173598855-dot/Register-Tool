@@ -71,7 +71,10 @@ def _cached_geo(proxy: str) -> dict[str, Any]:
         from ..geo import shared_geo_resolver
 
         geo = shared_geo_resolver().cached(proxy)
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # Lazy import (ImportError), cache-file read (OSError) and the cache key's
+        # own parse (TypeError/ValueError). A defect must not read as "not measured
+        # yet" -- see docs/audits/records/broad-except-boundary-2026-11-11.md §1.3.
         return {}
     if geo is None:
         return {}

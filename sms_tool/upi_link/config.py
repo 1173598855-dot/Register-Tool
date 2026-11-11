@@ -94,5 +94,9 @@ def _upi_retarget_region(proxy: Any, country: Any) -> str:
         from ..proxy.entry import retarget_region
 
         return str(retarget_region(value, target) or value)
-    except Exception:
+    except (ImportError, TypeError, ValueError):
+        # The lazy import plus the parser's own rejects (it narrows `urlsplit` to
+        # TypeError/ValueError and otherwise returns its input). Anything else is a
+        # defect, and returning the untouched proxy would hide it -- see
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.3.
         return value
