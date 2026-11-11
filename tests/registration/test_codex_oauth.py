@@ -962,5 +962,31 @@ class AboutYouResponseSurfaceTests(unittest.TestCase):
         self.assertEqual(len(result["body_digest"]["keys"]), 12)
 
 
+class ConfiguredMailboxIndexTests(unittest.TestCase):
+    """The configured-pool lookup must not report a defect as "no mailbox configured".
+
+    Lane-level template (docs/audits/records/broad-except-boundary-2026-11-11.md
+    §1.6): the argument-less ``load_mailbox_pool`` only reads config and token files,
+    so a lazy import plus OSError/ValueError/TypeError is its whole surface.
+    """
+
+    def test_degrades_when_the_pool_cannot_be_loaded(self):
+        from sms_tool.mailbox import router as mailbox_router
+
+        codex_oauth._configured_mailbox_index.cache_clear()
+        self.addCleanup(codex_oauth._configured_mailbox_index.cache_clear)
+        with patch.object(mailbox_router, "load_mailbox_pool", side_effect=OSError("token file unreadable")):
+            self.assertEqual(codex_oauth._configured_mailbox_index(), {})
+
+    def test_propagates_a_defect(self):
+        from sms_tool.mailbox import router as mailbox_router
+
+        codex_oauth._configured_mailbox_index.cache_clear()
+        self.addCleanup(codex_oauth._configured_mailbox_index.cache_clear)
+        with patch.object(mailbox_router, "load_mailbox_pool", side_effect=RuntimeError("bug in the pool loader")):
+            with self.assertRaises(RuntimeError):
+                codex_oauth._configured_mailbox_index()
+
+
 if __name__ == "__main__":
     unittest.main()

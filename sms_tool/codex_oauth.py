@@ -1470,9 +1470,12 @@ def _configured_mailbox_index():
             for candidate in load_mailbox_pool()
             if str(getattr(candidate, "email", "") or "").strip()
         }
-    except Exception:
-        # Recovery will report the ordinary missing-mailbox error; never leak
-        # a token-file or provider transport exception from this lookup.
+    except (ImportError, OSError, TypeError, ValueError):
+        # Recovery will report the ordinary missing-mailbox error. The call is
+        # argument-less, so `load_mailbox_pool` only reads config and token files
+        # here (never buys, never polls): that surface is a lazy import plus
+        # OSError/ValueError/TypeError. A defect is not "no mailbox configured" --
+        # see docs/audits/records/broad-except-boundary-2026-11-11.md §1.6.
         return {}
 
 

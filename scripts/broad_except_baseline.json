@@ -186,7 +186,7 @@
       "silent": 0
     },
     "sms_tool/codex_oauth.py": {
-      "broad": 15,
+      "broad": 14,
       "silent": 0
     },
     "sms_tool/codex_sentinel.py": {
@@ -494,7 +494,7 @@
       "silent": 4
     },
     "sms_tool/proxy/registry.py": {
-      "broad": 2,
+      "broad": 1,
       "silent": 0
     },
     "sms_tool/proxy/routing.py": {
@@ -752,11 +752,11 @@
         "reason": "The protocol lane is where a swallowed exception is indistinguishable from a protocol failure: it lands in the funnel as 'unknown' while the batch keeps spending mailboxes. Silent handlers are 0 here and the broad count may only shrink."
       }
     },
-    "max_broad": 874,
+    "max_broad": 872,
     "max_silent": 157
   },
   "totals": {
-    "broad": 874,
+    "broad": 872,
     "silent": 157
   },
   "whitelist": {

@@ -253,3 +253,33 @@ def test_acknowledged_lane_names_are_validated_and_normalised():
         {pr.PAYMENT}
     )
     assert pr.acknowledged_lane_overlaps({"proxy": {"allow_lane_overlap": 7}}) == frozenset()
+
+
+# ---------------------------------------------------------------------------
+# The legacy mailbox path: "no pool configured" is not "the resolver is broken"
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_mailbox_degrades_when_the_candidate_builder_fails(monkeypatch):
+    """A config/token read failure is an empty pool (lane-level template §1.6)."""
+    from sms_tool.mailbox import router as mailbox_router
+
+    def boom(*_args, **_kwargs):
+        raise OSError("config shard unreadable")
+
+    monkeypatch.setattr(mailbox_router, "mailbox_proxy_candidates", boom)
+
+    assert pr.resolve_mailbox({"proxy": {}}) == []
+
+
+def test_resolve_mailbox_propagates_a_defect(monkeypatch):
+    """A bug used to be indistinguishable from "this lane has no mailbox pool"."""
+    from sms_tool.mailbox import router as mailbox_router
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("bug in mailbox_proxy_candidates")
+
+    monkeypatch.setattr(mailbox_router, "mailbox_proxy_candidates", boom)
+
+    with pytest.raises(RuntimeError):
+        pr.resolve_mailbox({"proxy": {}})

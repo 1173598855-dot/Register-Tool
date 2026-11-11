@@ -209,7 +209,11 @@ def resolve_mailbox(config: Mapping[str, Any] | None, *, operation_proxy: str | 
         from ..mailbox.router import mailbox_proxy_candidates  # lazy: pulls provider adapters
 
         return parse_lane_proxy_pool(mailbox_proxy_candidates(operation_proxy, config))
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # Lazy import (ImportError), config read (OSError), and the candidate
+        # builder's parse rejects (TypeError/ValueError). A defect must not read as
+        # "this lane has no mailbox pool" -- see the lane-level template in
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.6.
         return []
 
 
