@@ -1,3 +1,5 @@
+import pytest
+
 from sms_tool.proxy.routing import (
     operation_proxy_candidates,
     proxy_pool_for,
@@ -205,3 +207,39 @@ def test_select_operation_proxy_still_puts_explicit_input_first():
         )
         == "http://explicit.example:8000"
     )
+
+
+# ---------------------------------------------------------------------------
+# _saved_registration_proxy: "no saved proxy" is not "the lookup broke"
+# ---------------------------------------------------------------------------
+
+
+def test_saved_registration_proxy_degrades_when_the_lookup_fails(monkeypatch):
+    """A read failure is "no saved exit" (lane-level template §1.9)."""
+    from sms_tool.accounts import account_identity
+    from sms_tool.proxy import routing as prouting
+
+    monkeypatch.setattr(prouting, "_use_registration_affinity", lambda config: True)
+
+    def boom(*_args, **_kwargs):
+        raise ValueError("identity context this build cannot read")
+
+    monkeypatch.setattr(account_identity, "resolve_account_proxy", boom)
+
+    assert prouting._saved_registration_proxy({"identity_context": {"proxy_affinity": {}}}, {}) == ""
+
+
+def test_saved_registration_proxy_propagates_a_defect(monkeypatch):
+    """A bug used to be indistinguishable from "this account has no saved exit"."""
+    from sms_tool.accounts import account_identity
+    from sms_tool.proxy import routing as prouting
+
+    monkeypatch.setattr(prouting, "_use_registration_affinity", lambda config: True)
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("bug in resolve_account_proxy")
+
+    monkeypatch.setattr(account_identity, "resolve_account_proxy", boom)
+
+    with pytest.raises(RuntimeError):
+        prouting._saved_registration_proxy({"identity_context": {"proxy_affinity": {}}}, {})

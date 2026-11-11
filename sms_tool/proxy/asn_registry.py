@@ -113,7 +113,10 @@ def _proxy_key(proxy: str | None) -> str:
         entry = parse_proxy(value)
         key = ProxyHealthTracker.key(entry.url if entry is not None else value)
         return "" if key == ":0" else key
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # The two lazy imports plus the parser/key helpers' own rejects. A defect
+        # must not be recorded as "this exit has no identity" -- see the lane-level
+        # template in docs/audits/records/broad-except-boundary-2026-11-11.md §1.9.
         return ""
 
 
@@ -499,7 +502,11 @@ def record_registration_outcome(
     """
     try:
         ledger = registry or AsnRegistry.from_config(config)
-    except Exception:
+    except (OSError, TypeError, ValueError):
+        # `from_config` builds the path from the config and opens the journal
+        # lazily: OSError (journal), TypeError/ValueError (path building). A defect
+        # is not "this proxy has no measured ASN" -- see §1.9 of
+        # docs/audits/records/broad-except-boundary-2026-11-11.md.
         return ""
     asn = cached_asn_of(proxy, registry=ledger)
     if not asn:

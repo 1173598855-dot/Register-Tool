@@ -178,7 +178,11 @@ def _saved_registration_proxy(
         from ..accounts.account_identity import resolve_account_proxy
 
         return normalize_proxy_url(resolve_account_proxy(account, config=config) or "") or ""
-    except Exception:
+    except (ImportError, OSError, TypeError, ValueError):
+        # Lazy import + the account-identity lookup + URL normalization: ImportError,
+        # OSError, TypeError/ValueError. A defect must not read as "this account has
+        # no saved registration proxy" -- see the lane-level template in
+        # docs/audits/records/broad-except-boundary-2026-11-11.md §1.9.
         return ""
 
 

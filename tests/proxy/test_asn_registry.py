@@ -174,3 +174,50 @@ def test_the_proxy_url_never_reaches_metadata_json(registry):
     assert "secret" not in str(row)
     # The persisted mapping still exists, but only as a credential-free key.
     assert registry.asn_of(proxy) == "AS9299"
+
+
+# ---------------------------------------------------------------------------
+# The ledger is an observation channel: a missing answer is not a defect
+# ---------------------------------------------------------------------------
+
+
+def test_proxy_key_degrades_when_the_parser_rejects_the_credential(monkeypatch):
+    from sms_tool.proxy import entry as proxy_entry
+
+    def boom(*_args, **_kwargs):
+        raise ValueError("credential template this build cannot parse")
+
+    monkeypatch.setattr(proxy_entry, "parse_proxy", boom)
+
+    assert asn_registry._proxy_key("http://region-HK-sess-1:pw@exit:1") == ""
+
+
+def test_proxy_key_propagates_a_defect(monkeypatch):
+    from sms_tool.proxy import entry as proxy_entry
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("bug in parse_proxy")
+
+    monkeypatch.setattr(proxy_entry, "parse_proxy", boom)
+
+    with pytest.raises(RuntimeError):
+        asn_registry._proxy_key("http://region-HK-sess-1:pw@exit:1")
+
+
+def test_record_registration_outcome_degrades_when_the_ledger_cannot_open(monkeypatch):
+    def boom(cls, config=None):
+        raise OSError("journal unreadable")
+
+    monkeypatch.setattr(AsnRegistry, "from_config", classmethod(boom))
+
+    assert record_registration_outcome("http://a:1", ok=True, config={}) == ""
+
+
+def test_record_registration_outcome_propagates_a_defect(monkeypatch):
+    def boom(cls, config=None):
+        raise RuntimeError("bug in from_config")
+
+    monkeypatch.setattr(AsnRegistry, "from_config", classmethod(boom))
+
+    with pytest.raises(RuntimeError):
+        record_registration_outcome("http://a:1", ok=True, config={})

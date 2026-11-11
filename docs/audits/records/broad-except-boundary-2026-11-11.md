@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 868，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 865，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,10 +23,10 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 868 handlers (157 silent) across 182 files; whitelisted 9; budget 868/157
+broad-except: 865 handlers (157 silent) across 181 files; whitelisted 9; budget 865/157
 ```
 
-扫描得到 **21 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3–§1.8 七批泳道级决策已解决；§1.2 的四处本就不在候选里）。
+扫描得到 **18 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3–§1.9 八批泳道级决策已解决；§1.2 的四处本就不在候选里）。
 
 ## 1. 本轮**已经收窄**的 2 处（写在这里，免得被当成"还没做"）
 
@@ -228,15 +228,35 @@ broad-except: 868 handlers (157 silent) across 182 files; whitelisted 9; budget 
 ⇒ **这一批的意义不只是 −2**：它给出了模板的**否定判据** —— 当 docstring 明确承诺「绝不抛出」、
 并且枚举了 `AttributeError` 这类内部异常时，**宽是对的**，硬收窄才是 bug。
 
+### 1.9 第九批：ASN 台账与注册亲和（`proxy/asn_registry` 两处 + `proxy/routing`）
+
+| 位置 | 收窄成 | 依据 |
+| --- | --- | --- |
+| `asn_registry._proxy_key` | `(ImportError, OSError, TypeError, ValueError)` | 两个惰性导入（`parse_proxy` / `ProxyHealthTracker`）+ 解析与 key 计算的拒绝 |
+| `asn_registry.record_registration_outcome` | `(OSError, TypeError, ValueError)` | `AsnRegistry.from_config` 只建路径并**惰性**开日志库：OSError + 路径构造的 TypeError/ValueError |
+| `routing._saved_registration_proxy` | `(ImportError, OSError, TypeError, ValueError)` | 惰性导入 + 账号身份查询 + URL 归一化 |
+
+三处的返回值（`""`）在调用方都是**「这个出口/账号没有可用的身份」**，而缺陷此前同义。
+`_proxy_key` 尤其重要：它给台账写 key，一个被吞掉的 bug 会变成"这个出口没有 ASN 归属记录"。
+
+**测试**六条（三处各降级 + 外抛）：`parse_proxy` 抛 `ValueError` → `""`、`RuntimeError` → 外抛；
+`AsnRegistry.from_config` 抛 `OSError` → `""`、`RuntimeError` → 外抛；`resolve_account_proxy`
+抛 `ValueError` → `""`、`RuntimeError` → 外抛（后两条先 monkeypatch
+`_use_registration_affinity` 让前置条件成立）。
+
+**门禁代价**：`broad-except` 868 → **865**（files 182 → 181），silent 不变，**零新增 import**；
+`extractor_parity` 与 `sunk_copy parity` 都复核过（`_proxy_key` 与 services 侧的
+`shared_proxy_key` 是**同名分歧实现**，不是沉底副本，parity 数字未变）。
+
 ⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
 记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
 
-## 2. 剩下 21 处：为什么必须宽着
+## 2. 剩下 18 处：为什么必须宽着
 
 > 表的"收窄要先动"一列是**测试文件**，不是"改一行代码"：这些 handler 的宽度被行为测试
 > 或注入的替身钉住，改之前得先确认那些替身喂进去的东西是否还成立。
 
-### A. try 体调用的是别处的函数（异常面不在本文件里）— 12 处
+### A. try 体调用的是别处的函数（异常面不在本文件里）— 9 处
 
 | 位置 | try 体调用的东西 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
@@ -244,6 +264,7 @@ broad-except: 868 handlers (157 silent) across 182 files; whitelisted 9; budget 
 | ~~`batch_runner._cached_exit_ip` + `payment/qualification._measured_country`~~ | 见 §1.5 | **已按 §1.5 解决**（读缓存/探测包装，与 §1.4 同构） | — |
 | ~~`codex_oauth._configured_mailbox_index` + `proxy/registry.resolve_mailbox`~~ | 见 §1.6 | **已按 §1.6 解决**（惰性导入 + 配置读取，照抄被调方面） | — |
 | ~~`paypal/protocol._load_config` + `payment/qualification_batch._dedicated_pool`~~ | 见 §1.7 | **已按 §1.7 解决**；`_load_config` 刻意不捕 `ConfigError`，交给已知如何降级的调用方 | — |
+| ~~`proxy/asn_registry._proxy_key` + `record_registration_outcome` + `proxy/routing._saved_registration_proxy`~~ | 见 §1.9 | **已按 §1.9 解决**：被调方异常面明确，照抄即可 | — |
 | `auth_headers.py:676` `_timezone_offset_minutes` | `offset_minutes_for_timezone` | 该函数自己文档写明"失败降级为 0 并打一次警告" | — |
 | `batch_runner.py:230` `_hold_environment_lease` | `acquire_environment_lease` | 自己的注释：租约是观测通道，**绝不能拖垮批次** | `tests/accounts/test_batch_environment_lease.py` |
 | `chatgpt_bootstrap.py:116` `_timezone_offset_minutes` | `page.evaluate(...)` | 浏览器驱动抛的是它自己的 `Error`，**不是** ValueError | — |
@@ -254,9 +275,6 @@ broad-except: 868 handlers (157 silent) across 182 files; whitelisted 9; budget 
 | `http_client.py:128` `_report_edge_challenge` | 注入的 `hook(...)` | 钩子是外部注入的，可以抛任何东西；失败必须退回今天的行为 | — |
 | `payment/wire.py:312` `_checkout_sentinel_headers` | 惰性导入 + `checkout_sentinel_headers(...)` | 该调用本身发网络请求 | — |
 | ~~`proxy/admin.py` `_health_rank` 两处~~ | `ProxyHealthTracker` / `resolve_registration` / `rank` | **已按 §1.3 解决**：被调方自己文档化了 `(OSError, TypeError, ValueError)`，照抄即可 | — |
-| `proxy/asn_registry.py:116` `_proxy_key` | 惰性导入 + `parse_proxy` + `ProxyHealthTracker.key` | 三个调用串起来，异常面跨模块 | `tests/payment/test_extractor_parity_report.py` |
-| `proxy/asn_registry.py:502` `record_registration_outcome` | `AsnRegistry.from_config(config)` | 配置读取 + 注册表构造 | `tests/proxy/test_asn_registry.py` |
-| `proxy/routing.py:181` `_saved_registration_proxy` | 惰性导入 + `resolve_account_proxy(...)` | 解析账号代理，异常面在 accounts 层 | — |
 
 ### B. 形状的自然元组是 `INTERNAL_EXCEPTION_TYPES` 的子集 — 3 处
 
@@ -304,7 +322,7 @@ broad-except: 868 handlers (157 silent) across 182 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 868，八批泳道级决策）；第二半的第一个
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 865，九批泳道级决策）；第二半的第一个
 点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）
