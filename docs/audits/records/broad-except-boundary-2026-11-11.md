@@ -3,7 +3,7 @@
 配套文件：`docs/audits/records/baseline-2026-11-11-platform-rollout.md`（基线快照）、
 方案 `docs/audits/plans/plan-2026-11-10-platform-rollout.md` 的 Phase 6。
 
-**这份文件解决的问题**：broad-except 轴从 959 降到 865，但"降到多少"不是判据 ——
+**这份文件解决的问题**：broad-except 轴从 959 降到 864，但"降到多少"不是判据 ——
 **剩下每一处为什么还宽着**才是。评审的目标是让下一个人不必重新推一遍：每一处都写明
 它属于哪一类、为什么不能按形状收窄、以及**真要收窄得先动哪些测试**。
 
@@ -23,10 +23,10 @@
 
 ```text
 python scripts/broad_except_ratchet.py
-broad-except: 865 handlers (157 silent) across 181 files; whitelisted 9; budget 865/157
+broad-except: 864 handlers (157 silent) across 181 files; whitelisted 9; budget 864/157
 ```
 
-扫描得到 **18 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3–§1.9 八批泳道级决策已解决；§1.2 的四处本就不在候选里）。
+扫描得到 **17 个**候选（本轮开始时 38 个：§1 两处结构回退 + §1.1/§1.3–§1.10 九批泳道级决策已解决；§1.2 的四处本就不在候选里）。**A 类已清空**——剩下的全部是 B/C/D 类，即「按判据就不该动」的那些（元组子集 / 第三方错误类型 / never-raises 契约）。
 
 ## 1. 本轮**已经收窄**的 2 处（写在这里，免得被当成"还没做"）
 
@@ -248,15 +248,40 @@ broad-except: 865 handlers (157 silent) across 181 files; whitelisted 9; budget 
 `extractor_parity` 与 `sunk_copy parity` 都复核过（`_proxy_key` 与 services 侧的
 `shared_proxy_key` 是**同名分歧实现**，不是沉底副本，parity 数字未变）。
 
+### 1.10 第十批：一处收窄，七处**降级为"判据上不该动"并附文档依据**
+
+**收窄 1 处**：`auth_headers._timezone_offset_minutes` → `(ImportError, TypeError, ValueError)`。
+被调方 `geo.clock.offset_minutes_for_timezone` **自己就会降级**（空白/未知名字返回 `default`，
+缺 tzdata 时警告一次），所以这层剩下的只有惰性导入。此前一个 bug 会被读成"UTC"。
+
+**其余 7 处重新分类**（从 A 类移出，不再算"待收窄"）：
+
+| 位置 | 移入 | 依据（文件自己写的） |
+| --- | --- | --- |
+| `batch_runner._hold_environment_lease` | D · never-fatal | 注释：租约是观测通道，**绝不能拖垮批次** |
+| `chatgpt_bootstrap._timezone_offset_minutes` | C · 第三方错误类型 | `page.evaluate` 抛的是浏览器驱动自己的 `Error`，不是 ValueError |
+| `doctor._phone_provider_rows` | D · advisory | `# pragma: no cover - advisory only`：配置坏掉时正是 doctor 被用来诊断的时候 |
+| `doctor._phone_key_collisions` | D · advisory | 同上 |
+| `doctor.unread_config_keys_safe` | D · advisory | 同上 |
+| `http_client._is_edge_challenge` | D · never-raises | 注释：**观测绝不能把传输回包变成崩溃**（且有 `class Exploding` 替身钉住） |
+| `http_client._report_edge_challenge` | D · never-raises | 注入的 hook 可以抛任何东西；失败必须退回今天的行为 |
+| `payment/wire._checkout_sentinel_headers` | D · never-fatal | docstring：**Never fatal**，缺本地 runner 就降级成无 header，调用方保留自己的重试/分类路径 |
+
+⇒ **A 类清空**。这不是"剩下的不做了"，而是**判据用完了**：这 8 处要么其 docstring/注释就是
+"绝不抛出/绝不能失败"的契约（D 类），要么异常类型来自第三方且不是 Python 内建层（C 类）。
+硬收窄它们不是改进，是把「契约」改成「偶尔崩」。
+
 ⇒ **这就是下一个泳道级点位的模板**：找出泳道自带的错误类型 → 读者不再吞 → 调用方用窄元组
 记原因 → 更新喂 `object()`/`RuntimeError` 的替身 → 三条棘轮各自记录代价。
 
-## 2. 剩下 18 处：为什么必须宽着
+## 2. 剩下 17 处：为什么必须宽着
 
 > 表的"收窄要先动"一列是**测试文件**，不是"改一行代码"：这些 handler 的宽度被行为测试
 > 或注入的替身钉住，改之前得先确认那些替身喂进去的东西是否还成立。
 
-### A. try 体调用的是别处的函数（异常面不在本文件里）— 9 处
+### A. try 体调用的是别处的函数（异常面不在本文件里）— 0 处
+
+**已清空**：本类最后 8 处经核对全部属于「docstring/注释就是 never-raises 或 never-fatal 契约」（移入 D 类）或「第三方错误类型」（移入 C 类），逐条依据见 §1.10。
 
 | 位置 | try 体调用的东西 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
@@ -265,15 +290,6 @@ broad-except: 865 handlers (157 silent) across 181 files; whitelisted 9; budget 
 | ~~`codex_oauth._configured_mailbox_index` + `proxy/registry.resolve_mailbox`~~ | 见 §1.6 | **已按 §1.6 解决**（惰性导入 + 配置读取，照抄被调方面） | — |
 | ~~`paypal/protocol._load_config` + `payment/qualification_batch._dedicated_pool`~~ | 见 §1.7 | **已按 §1.7 解决**；`_load_config` 刻意不捕 `ConfigError`，交给已知如何降级的调用方 | — |
 | ~~`proxy/asn_registry._proxy_key` + `record_registration_outcome` + `proxy/routing._saved_registration_proxy`~~ | 见 §1.9 | **已按 §1.9 解决**：被调方异常面明确，照抄即可 | — |
-| `auth_headers.py:676` `_timezone_offset_minutes` | `offset_minutes_for_timezone` | 该函数自己文档写明"失败降级为 0 并打一次警告" | — |
-| `batch_runner.py:230` `_hold_environment_lease` | `acquire_environment_lease` | 自己的注释：租约是观测通道，**绝不能拖垮批次** | `tests/accounts/test_batch_environment_lease.py` |
-| `chatgpt_bootstrap.py:116` `_timezone_offset_minutes` | `page.evaluate(...)` | 浏览器驱动抛的是它自己的 `Error`，**不是** ValueError | — |
-| `doctor.py:179` `_phone_provider_rows` | `provider_key_status(...)` | doctor 是 advisory 工具：配置坏掉时正是它被用来诊断的时候 | — |
-| `doctor.py:212` `_phone_key_collisions` | `provider_key_collisions(...)` | 同上 | — |
-| `doctor.py:473` `unread_config_keys_safe` | `cached_unread_config_keys()` | 同上（`# pragma: no cover - advisory only`） | — |
-| `http_client.py:96` `_is_edge_challenge` | `edge_challenge_verdict(response)` | 注释：**观测绝不能把传输回包变成崩溃** | `tests/registration/test_edge_challenge_verdict.py`（含 `class Exploding` 替身，属性故意抛 RuntimeError） |
-| `http_client.py:128` `_report_edge_challenge` | 注入的 `hook(...)` | 钩子是外部注入的，可以抛任何东西；失败必须退回今天的行为 | — |
-| `payment/wire.py:312` `_checkout_sentinel_headers` | 惰性导入 + `checkout_sentinel_headers(...)` | 该调用本身发网络请求 | — |
 | ~~`proxy/admin.py` `_health_rank` 两处~~ | `ProxyHealthTracker` / `resolve_registration` / `rank` | **已按 §1.3 解决**：被调方自己文档化了 `(OSError, TypeError, ValueError)`，照抄即可 | — |
 
 ### B. 形状的自然元组是 `INTERNAL_EXCEPTION_TYPES` 的子集 — 3 处
@@ -288,17 +304,25 @@ broad-except: 865 handlers (157 silent) across 181 files; whitelisted 9; budget 
 | `auth_headers.py:470` `_auth_fingerprint_config` | 惰性导入 + `CFG.get` 链 | `(AttributeError, ImportError, TypeError)` → 子集 | `tests/registration/test_auth_headers_and_classification.py` |
 | `sentinel_tokens.py:132` `_cookie_jar_header` | 供应商 cookie jar 的属性探测 | `(AttributeError, TypeError)` → 子集 | `tests/registration/test_registration_concurrency.py` |
 
-### C. 第三方解析器的错误类型不是 `ValueError` — 2 处
+### C. 第三方解析器的错误类型不是 `ValueError` — 3 处
 
 | 位置 | try 体 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
+| `chatgpt_bootstrap.py:116` `_timezone_offset_minutes` | `page.evaluate(...)` | 浏览器驱动抛的是它自己的 `Error`，**不是** ValueError | — |
 | `providers/cfworker_client.py:436` `_decode_rfc822_body` | `Parser(policy=...).parsestr(...)` | `email.errors.MessageError` **不是** ValueError 的子类；按 `(TypeError, ValueError)` 收窄会漏掉真正的畸形邮件 | — |
 | `providers/cfworker_client.py:465` `_decode_header_value` | `make_header(decode_header(...))` | `email.errors.HeaderParseError`，同上 | `tests/mailbox/test_cfworker_client.py` |
 
-### D. 外部资源 / 宿主数据库 / never-raises 契约 — 4 处
+### D. 外部资源 / 宿主数据库 / never-raises 契约 — 11 处
 
 | 位置 | try 体 | 为什么宽着 | 收窄要先动 |
 | --- | --- | --- | --- |
+| `batch_runner.py:230` `_hold_environment_lease` | `acquire_environment_lease` | 自己的注释：租约是观测通道，**绝不能拖垮批次** | `tests/accounts/test_batch_environment_lease.py` |
+| `doctor.py:179` `_phone_provider_rows` | `provider_key_status(...)` | doctor 是 advisory 工具：配置坏掉时正是它被用来诊断的时候 | — |
+| `doctor.py:212` `_phone_key_collisions` | `provider_key_collisions(...)` | 同上 | — |
+| `doctor.py:473` `unread_config_keys_safe` | `cached_unread_config_keys()` | 同上（`# pragma: no cover - advisory only`） | — |
+| `http_client.py:96` `_is_edge_challenge` | `edge_challenge_verdict(response)` | 注释：**观测绝不能把传输回包变成崩溃** | `tests/registration/test_edge_challenge_verdict.py`（含 `class Exploding` 替身，属性故意抛 RuntimeError） |
+| `http_client.py:128` `_report_edge_challenge` | 注入的 `hook(...)` | 钩子是外部注入的，可以抛任何东西；失败必须退回今天的行为 | — |
+| `payment/wire.py:312` `_checkout_sentinel_headers` | 惰性导入 + `checkout_sentinel_headers(...)` | docstring：**Never fatal** —— 缺本地 runner 就降级成无 header，调用方保留自己的重试/分类路径 | — |
 | `browser_pool.py:145` `_browser_footprint_mb` | psutil 进程树遍历（内层已按 `_psutil.Error` 收窄） | 外层是 advisory 内存测量：`# noqa: BLE001 - advisory measurement only` | — |
 | `upi_link/dump.py` `_upi_dump_http` | `directory.mkdir` + `path.write_text` + 格式化帮手 | docstring 承诺「绝不抛异常」，并明确枚举「响应对象没有 `.text`」——即 `AttributeError`；收窄会违反该契约，加进元组又成内部子集（见 §1.8） | — |
 | `pp_link_helpers.py:692` `reserve_billing_variant` | 跨进程锁 + JSON 读写 | 自己的注释：`GateTimeoutError`、`OSError`、JSON 垃圾、**以及其它任何东西**都必须降级，因为身份是 advisory | `tests/payment/test_paypal_pp_link_helpers.py` |
@@ -322,7 +346,7 @@ broad-except: 865 handlers (157 silent) across 181 files; whitelisted 9; budget 
    要给 `sms_tool -> sms_tool/kernel` 加边（现在 35 条顶死）。除非同时删掉别的边，否则不放。
 
 两条都不该在"逐文件切片"里顺手做 —— 这正是方案 Phase 6 写的"先做跨泳道的结构回退类，
-再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 865，九批泳道级决策）；第二半的第一个
+再单独立项处理泳道内的宽 handler"。**第一半已完成（959 → 864，十批泳道级决策，A 类清空）；第二半的第一个
 点位已按 §1.1 落地，其余需要排期，不需要重新调研。**
 
 ## 4. 每次收窄的固定八步（沉淀下来）

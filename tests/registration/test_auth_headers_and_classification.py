@@ -668,5 +668,35 @@ class FingerprintPoolVersionMatrixTests(unittest.TestCase):
         self.assertIsNone(pool.select("nonexistent_profile_xyz"))
 
 
+class TimezoneOffsetDegradesTests(unittest.TestCase):
+    """The clock helper degrades internally; the wrapper only needs the import guard.
+
+    Lane-level template (docs/audits/records/broad-except-boundary-2026-11-11.md
+    §1.10): ``geo.clock.offset_minutes_for_timezone`` returns ``default`` for a
+    blank or unknown name and warns once when tzdata is absent, so this wrapper's
+    surface is the lazy import plus the usual parse rejects.
+    """
+
+    def test_a_blank_timezone_degrades_to_zero(self):
+        self.assertEqual(auth_headers._timezone_offset_minutes(""), 0)
+
+    def test_the_clock_helper_owns_the_unknown_name_case(self):
+        self.assertEqual(auth_headers._timezone_offset_minutes("Not/AZone"), 0)
+
+    def test_a_parse_rejection_degrades_to_zero(self):
+        from sms_tool.geo import clock
+
+        with patch.object(clock, "offset_minutes_for_timezone", side_effect=ValueError("bad tz")):
+            self.assertEqual(auth_headers._timezone_offset_minutes("Europe/Berlin"), 0)
+
+    def test_a_defect_in_the_clock_helper_propagates(self):
+        """A bug used to be indistinguishable from "this host has no tzdata"."""
+        from sms_tool.geo import clock
+
+        with patch.object(clock, "offset_minutes_for_timezone", side_effect=RuntimeError("bug in the clock")):
+            with self.assertRaises(RuntimeError):
+                auth_headers._timezone_offset_minutes("Europe/Berlin")
+
+
 if __name__ == "__main__":
     unittest.main()

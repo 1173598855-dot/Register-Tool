@@ -673,7 +673,12 @@ def _timezone_offset_minutes(tz_name: str) -> int:
         from .geo.clock import offset_minutes_for_timezone
 
         return offset_minutes_for_timezone(tz_name, 0)
-    except Exception:
+    except (ImportError, TypeError, ValueError):
+        # The clock helper already degrades internally -- it returns `default` for a
+        # blank/unknown name and warns once when tzdata is missing -- so the only
+        # surface left here is the lazy import plus the usual parse rejects. A defect
+        # used to read as "UTC" -- see docs/audits/records/broad-except-boundary-2026-11-11.md
+        # §1.10.
         return 0
 
 
