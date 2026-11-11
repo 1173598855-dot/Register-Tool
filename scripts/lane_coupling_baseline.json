@@ -171,6 +171,8 @@
     "sms_tool.mailbox",
     "sms_tool.mailbox.router",
     "sms_tool.otp_strategy",
+    "sms_tool.packs",
+    "sms_tool.packs.dispatch",
     "sms_tool.phone_proxy",
     "sms_tool.phone_registration",
     "sms_tool.registration",

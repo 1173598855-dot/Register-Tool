@@ -1,5 +1,9 @@
 {
   "edges": {
+    "sms_tool/registration/orchestrator.py -> sms_tool.packs": {
+      "reason": "deferred",
+      "why": "the two capability lookups wired in Phase 2.1/2.2 (session.access_token for the AT probe, mailbox.otp for the OTP poll) are routing decisions made per call, not startup dependencies, and this lane's module-level import budget into sms_tool is frozen. Function-local means the default single-pack build pays nothing at import time, and a missing or broken pack falls back to the owning module exactly as before"
+    },
     "sms_tool/agent_identity.py -> sms_tool.kernel.transport": {
       "reason": "deferred",
       "why": "the two agent-registration POSTs catch exactly the transport errors they can raise, so a refused proxy is reported as request_failed while a defect propagates. The tuple lives in kernel.transport because that module exists to be the one place narrowing sites import; a module-level import would add an edge to the frozen sms_tool -> sms_tool/kernel pair for a tuple used in three handlers"

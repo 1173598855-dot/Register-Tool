@@ -92,19 +92,26 @@ registry 时永不缓存」；性能上批处理里 `load_registry` 调用次数
 
 | # | 能力 | dispatch 点 | 状态 |
 | --- | --- | --- | --- |
-| 2.1 | `session.access_token` | AT 探活阶段 | **阻塞**：消费方是 `registration/account_stages.py`，而 `sms_tool/registration -> sms_tool` 的 import 预算已满；**Phase 4 之后自动解锁**（实现搬进 `platforms/chatgpt/` 后就与 `packs` 同目录节点，导入免费） |
-| 2.2 | `mailbox.otp` | `registration/otp_stages.py` 取码阶段 | **同上阻塞、同上解锁路径** |
+| 2.1 | `session.access_token` | AT 探活（`registration/account_stages.py` 经 `workflow.r`） | **✅ 已完成（2026-11-11）**：`orchestrator._pack_access_token_probe()` 在**构建 operations bundle 时**向 pack 解析 `access_token_probe`；函数内导入 `pack_dispatch`，模块级预算一分未动。**此前"被 import 预算挡住"的判断是错的** —— 实测 `import-layer` 仍 459/78，`delayed` +2 条带书面理由 |
+| 2.2 | `mailbox.otp` | 取码（`registration/orchestrator.py` 的惰性再导出 `poll_email_otp`） | **✅ 已完成（2026-11-11）**：`orchestrator._resolve_lazy_export()` 对`_CAPABILITY_BACKED_EXPORTS` 里的名字先问 pack，失败再回落到原模块 —— 单 pack 构建行为逐字节不变 |
 | 2.3 | `payment.link` | `--generate-ba-link` → `commands/payment_links.py` | **已完成**：只在显式给了 `--pack` 时注入 `link_factory`；默认保留支付泳道自己的方法注册表（不然就是第二套注册表） |
 | 2.4 | `account.registration.email` | `cli._load_heavy_deps` 解析 `run_email` | **已完成**：manifest 决定注册入口，不再是 import；单 pack 时是同对象 |
 | 2.5 | `payment.batch` + 批量注册 | `cli._main_registration_pipeline` | 待做（依赖 2.4 的批量路径） |
 | 2.6 | 台账 code↔ledger 双向 | 新增 pack 作用域 flag reader | 待做 |
 
-**已完成的 §2.3/2.4 都没有新增 import 边**：`import-layer` 仍是 473 边 / 78 对，
+**2.1/2.2 触发了另一道门禁，并已按它的机制处理**：`lane_coupling_ratchet` 规则 5 冻结
+`registration/orchestrator.py` 的**依赖目标集合**（"移动一个 import 不能掩盖新增依赖"）。接线后它抓到
+两条新增：`-> sms_tool.packs` 与 `-> sms_tool.packs.dispatch`。这两条是**刻意**的——注册 facade
+现在就是绑定能力入口的地方——所以按该规则提供的唯一机制处理：`--update-baseline`
+（fan-out 34 → 36，diff 只有两行），并把理由记在这里与提交信息里。**注意这不是 import 预算问题**：
+`import-layer` 全程 459/78 未动，被挡住的是 facade 的依赖目标集合。
+
+**§2.1–2.5 都没有新增模块级 import 边**：`import-layer` 仍是 459 边 / 78 对（2.1/2.2 的两条函数内导入记在 `delayed`，并带 `delayed_import_reasons.json` 的书面理由），
 `delayed` 仍是 473/362 —— 这是"命令层解析 + 关键字注入"这条约束的直接证据。
 
 **2.1/2.2 的决策已明确，不必现在拍板**：它们不是"做不做"的问题，而是"什么时候"。
 Phase 4 把实现搬进 `platforms/chatgpt/` 之后，该目录与 `packs` 同属 `sms_tool` 目录节点，
-导入不计边，两处 dispatch 点可以零成本接上。**所以 P4 不是可选项，它是 2.1/2.2 的前置。**
+导入不计边，两处 dispatch 点可以零成本接上。**P4 仍然值得做（实现搬进 platforms/ 后导入更自然），但它不是 2.1/2.2 的前置** —— 这一点已由实测推翻：函数内导入的 dispatch 解析让两处接线在**不改任何模块级预算**的前提下落地。
 
 **每个能力的固定三件套测试**（照 `account.health` 的样子）：
 1. 对象同一性：解析出的 callable `is` 工作流原本 import 的那个

@@ -454,3 +454,56 @@ def test_a_missing_batch_capability_surfaces_at_startup(monkeypatch: pytest.Monk
 
     with pytest.raises(dispatch.CapabilityDispatchError):
         cli._load_batch_deps()
+
+
+# ---------------------------------------------------------------------------
+# Phase 2.1 / 2.2: the two registration-lane capabilities
+# ---------------------------------------------------------------------------
+
+
+def test_the_access_token_probe_entrypoint_is_the_registration_object() -> None:
+    from sms_tool.registration import orchestrator
+
+    resolved = dispatch.resolve_capability_entrypoint("session.access_token", "access_token_probe")
+
+    assert resolved is orchestrator._probe_registration_access_token
+
+
+def test_the_mailbox_otp_entrypoint_is_the_router_object() -> None:
+    from sms_tool.mailbox import router
+
+    resolved = dispatch.resolve_capability_entrypoint("mailbox.otp", "poll_email_otp")
+
+    assert resolved is router.poll_email_otp
+
+
+def test_the_operations_bundle_takes_the_probe_from_the_pack() -> None:
+    """2.1 wiring: the bundle the stages call holds the manifest's callable.
+
+    It is the same object while one pack exists, but the manifest is what decides.
+    A patch on the module attribute is read before the bundle is built, which is why
+    ``tests/registration/test_registration_at_probe.py`` still sees its own double.
+    """
+    from sms_tool.registration import orchestrator
+
+    bundle = orchestrator._email_registration_operations()
+
+    assert bundle._probe_registration_access_token is orchestrator._probe_registration_access_token
+
+
+def test_the_otp_poll_lazy_export_takes_the_callable_from_the_pack() -> None:
+    """2.2 wiring: the registration facade resolves the poll through the manifest."""
+    from sms_tool.mailbox import router
+    from sms_tool.registration import orchestrator
+
+    orchestrator.__dict__.pop("poll_email_otp", None)  # force the lazy path
+
+    assert getattr(orchestrator, "poll_email_otp") is router.poll_email_otp
+
+
+def test_an_unknown_entrypoint_name_is_a_named_error() -> None:
+    """A capability with no such entrypoint must not silently resolve to something."""
+    with pytest.raises(KeyError) as excinfo:
+        dispatch.resolve_capability_entrypoint("mailbox.otp", "no_such_entrypoint")
+
+    assert "no entrypoint" in str(excinfo.value)

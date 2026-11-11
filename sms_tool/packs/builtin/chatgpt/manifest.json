@@ -19,8 +19,10 @@
     "chat": "https://chatgpt.com"
   },
   "entrypoints": {
+    "access_token_probe": "sms_tool.registration.orchestrator:_probe_registration_access_token",
     "account_liveness": "sms_tool.accounts.account_liveness:probe_account_liveness",
     "paypal_link": "sms_tool.gen_pp_link:generate_pp_link",
+    "poll_email_otp": "sms_tool.mailbox.router:poll_email_otp",
     "register_batch": "sms_tool.registration.orchestrator:run_batch",
     "register_batch_impl": "sms_tool.batch_runner:run_batch_impl",
     "register_email": "sms_tool.registration.orchestrator:run_email",

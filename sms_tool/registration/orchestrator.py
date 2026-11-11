@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import importlib
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 __all__ = [
     "CFG",
@@ -209,9 +209,38 @@ def __getattr__(name: str) -> Any:
         module_name, attribute = _MODULE_EXPORTS[name]
     except KeyError:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
-    value = getattr(importlib.import_module(module_name), attribute)
+    value = _resolve_lazy_export(name, module_name, attribute)
     globals()[name] = value
     return value
+
+
+#: Lazy re-exports whose callable is a *capability* a pack claims, name -> capability.
+#: Everything else in ``_MODULE_EXPORTS`` is a plain re-export and is resolved straight
+#: from its owning module.
+_CAPABILITY_BACKED_EXPORTS: dict[str, str] = {
+    "poll_email_otp": "mailbox.otp",
+}
+
+
+def _resolve_lazy_export(name: str, module_name: str, attribute: str) -> Any:
+    """Resolve one lazy re-export, asking the pack first when it names a capability.
+
+    The import is function-local on purpose: this module's module-level budget into
+    ``sms_tool`` is frozen (``import_layer_ratchet``), and a capability lookup is a
+    routing decision made per call, not a startup dependency. The owning module stays
+    the fallback, so a build whose pack does not claim the capability -- or a broken
+    pack -- behaves exactly as it did before this wiring existed.
+    """
+    capability = _CAPABILITY_BACKED_EXPORTS.get(name)
+    if capability is None:
+        return getattr(importlib.import_module(module_name), attribute)
+
+    from sms_tool.packs import PackManifestError, dispatch as pack_dispatch
+
+    try:
+        return pack_dispatch.resolve_capability_entrypoint(capability, name)
+    except (pack_dispatch.CapabilityDispatchError, PackManifestError):
+        return getattr(importlib.import_module(module_name), attribute)
 
 
 def __dir__() -> list[str]:
@@ -328,6 +357,25 @@ def probe_account_liveness(*args, **kwargs):
     return account_liveness.probe_account_liveness(*args, **kwargs)
 
 
+def _pack_access_token_probe(default: Callable[..., Any]) -> Callable[..., Any]:
+    """Let the pack that claims ``session.access_token`` name the AT probe.
+
+    ``default`` is the module-level name, read when the operations bundle is built --
+    which is what keeps ``patch.object(registration, "_probe_registration_access_token")``
+    working: the patch replaces the module attribute before this runs, and
+    ``resolve_capability_entrypoint`` reads the module attribute again, so both paths
+    see the same patched callable. The import is function-local because this module's
+    module-level budget into ``sms_tool`` is frozen (``import_layer_ratchet``).
+    """
+    from sms_tool.packs import PackManifestError, dispatch as pack_dispatch
+
+    try:
+        return pack_dispatch.resolve_capability_entrypoint("session.access_token", "access_token_probe")
+    except (pack_dispatch.CapabilityDispatchError, PackManifestError):
+        # No pack claims it (or the pack is unreadable): keep the module's own probe.
+        return default
+
+
 def _email_registration_operations() -> RegistrationOperations:
     """Explicit dependency wiring for the protocol (email) registration flow.
 
@@ -375,7 +423,7 @@ def _email_registration_operations() -> RegistrationOperations:
             "_fetch_client_auth_session_dump": _fetch_client_auth_session_dump,
             "_oauth_result_summary": _oauth_result_summary,
             "_prepare_signup_auth_state": _prepare_signup_auth_state,
-            "_probe_registration_access_token": _probe_registration_access_token,
+            "_probe_registration_access_token": _pack_access_token_probe(_probe_registration_access_token),
             "_create_account_continue_url": _create_account_continue_url,
             "_follow_continue_url": _follow_continue_url,
             "_is_chatgpt_auth_login_landing": _is_chatgpt_auth_login_landing,
