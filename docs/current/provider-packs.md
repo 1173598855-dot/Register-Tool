@@ -262,3 +262,23 @@ packs.<pack_id>.toggles.<key> = {kind, default, status, doc, [id], [verdict], [e
 - **不让 manifest 承载重试策略。** `retryable`/`terminal` 是观测分类，处置仍在
   `registration/policy.py` 与 `failure_registry`；否则每个 pack 会长出一套
   自己的重试语义。
+
+## 能力接线现状（2026-11-11）
+
+manifest 声明的是**能力**，真正决定"哪套架构的哪个可调用对象在跑"的是
+`packs/dispatch.resolve_capability_entrypoint`。已接线的六个能力与各自的分派点：
+
+| 能力 | 分派点 | 方式 |
+| --- | --- | --- |
+| `account.health` | `--quota-usage` / `--refresh-local-quota` / `--one-click-scan` | 命令层解析，关键字注入 `probe_fn=` |
+| `account.registration.email` | `cli._load_heavy_deps`（单账号）、`_load_batch_deps`（批量） | 命令层解析 |
+| `payment.link` | `--generate-ba-link` | **仅显式 `--pack` 时**注入 `link_factory`；默认保留支付泳道自己的方法注册表 |
+| `session.access_token` | `registration/orchestrator._pack_access_token_probe()` → operations bundle | 构建 bundle 时解析；模块级名字仍是默认值，所以测试替身照旧生效 |
+| `mailbox.otp` | `registration/orchestrator._resolve_lazy_export()`（惰性再导出表） | 先问 pack，失败回落到原模块 |
+| `payment.batch` | 未接线 | 待 P3 之后 |
+
+后两条的分派都在**函数内**导入 `packs.dispatch`：`import_layer_ratchet` 的模块级预算因此一分未动
+（459 边 / 78 对）。代价是两条**有书面理由**的 deferred 边
+（`registration/orchestrator.py -> sms_tool.packs`，见 `delayed_import_reasons.json`），以及
+`lane_coupling_ratchet` 规则 5 的 facade 目标集合 **34 → 36** —— 那是一次显式复核
+（注册 facade 现在就是绑定能力入口的地方），不是静默放行。
